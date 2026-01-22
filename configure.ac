@@ -1,7 +1,5 @@
-AC_PREREQ([2.65])
-AC_INIT([sstp-client], 
-        [1.0.9],
-        [http://sourceforge.net/projects/sstp-client])
+AC_PREREQ([2.72])
+AC_INIT([sstp-client],[1.1.0],[https://github.com/sctg-development/sstp-client])
 
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 AC_CONFIG_MACRO_DIR([m4])
@@ -14,12 +12,12 @@ AC_CONFIG_HEADERS([config.h])
 AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_INSTALL
-AC_PROG_LIBTOOL
+LT_INIT
 LIBEVENT2_MINIMUM=2.0.10
 
 # Check if user asked us to compile with 1.4 support
 AC_ARG_WITH(libevent,
-    AC_HELP_STRING([--with-libevent], [Specify the libevent version to compile with]),
+    AS_HELP_STRING([--with-libevent],[Specify the libevent version to compile with]),
     [with_libevent="$withval"], [with_libevent="1"])
 
 AS_CASE([$with_libevent],
@@ -42,6 +40,16 @@ LIBS="$LIBS $OPENSSL_LIBS"
 CFLAGS="$CFLAGS $OPENSSL_INCLUDES"
 LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
 
+# Detect modern OpenSSL provider API (EVP_MAC) available in OpenSSL 3+
+AC_MSG_CHECKING([for OpenSSL EVP_MAC provider API (EVP_MAC_fetch)])
+AC_CHECK_FUNCS([EVP_MAC_fetch EVP_MAC_init EVP_MAC_update EVP_MAC_final])
+if test "x$ac_cv_func_EVP_MAC_fetch" = "xyes"; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([HAVE_EVP_MAC], [1], [Define if OpenSSL EVP_MAC API is available])
+else
+    AC_MSG_RESULT([no])
+fi
+
 
 # Check for openpty
 AC_CHECK_LIB([util], [openpty])
@@ -49,7 +57,7 @@ AC_CHECK_LIB([util], [openpty])
 
 # Specify privilege separation user
 AC_ARG_ENABLE(user,
-    AC_HELP_STRING([--enable-user=user], [Drop privileges after start to this user (default: sstpc)]))
+    AS_HELP_STRING([--enable-user=user],[Drop privileges after start to this user (default: sstpc)]))
 AS_IF([ test "${enable_user}" = "yes" || test x"${enable_user}" = x"" ],
     [enable_user="sstpc"],
     [enable_user="root"])
@@ -59,7 +67,7 @@ AC_DEFINE_UNQUOTED(SSTP_USER, "${enable_user}", The sstpc privilege drop user)
 
 # Specify privilege separation group
 AC_ARG_ENABLE(group,
-    AC_HELP_STRING([--enable-group=group], [Drop privileges after start to this group (default: sstpc)]))
+    AS_HELP_STRING([--enable-group=group],[Drop privileges after start to this group (default: sstpc)]))
 AS_IF([ test "${enable_group}" = "yes" || test x"${enable_group}" = x"" ],
     [enable_group="sstpc"],
     [enable_group="root"])
@@ -69,7 +77,7 @@ AC_DEFINE_UNQUOTED(SSTP_GROUP, "${enable_group}", The sstpc privilege drop group
 
 # Specify runtime directory
 AC_ARG_WITH([runtime-dir], 
-	AC_HELP_STRING([--with-runtime-dir=DIR], [Specify the runtime directory for sstpc]))
+	AS_HELP_STRING([--with-runtime-dir=DIR],[Specify the runtime directory for sstpc]))
 AS_IF([ test -n "$with_runtime_dir"],
 	[SSTP_RUNTIME_DIR="$with_runtime_dir"],
 	[SSTP_RUNTIME_DIR="${localstatedir}/run/sstpc"])
@@ -77,7 +85,7 @@ AC_SUBST(SSTP_RUNTIME_DIR)
 
 # Check to see if we enabled PPP plug-in support (default:yes)
 AC_ARG_ENABLE(ppp-plugin, 
-    AC_HELP_STRING([--disable-ppp-plugin=DIR], [disable PPP Plugin support]),
+    AS_HELP_STRING([--disable-ppp-plugin=DIR],[disable PPP Plugin support]),
     [enable_ppp_plugin=${enableval}], [enable_ppp_plugin=yes])
 AS_IF([test "x$enable_ppp_plugin" != "xno"],
     AC_CHECK_HEADER(pppd/pppd.h,,

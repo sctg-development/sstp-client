@@ -3,7 +3,7 @@
  *
  * @file sstp-http.c
  *
- * @author Copyright (C) 2011 Eivind Naess, 
+ * @author Copyright (C) 2011 Eivind Naess, 2026 Ronan Le Meillat - SCTG Development,
  *      All Rights Reserved
  *
  * @par License:
@@ -45,7 +45,7 @@
  * @endcode
  *
  * @par TODO:
- *  We need to improve the receive logic in this file to make sure we drain 
+ *  We need to improve the receive logic in this file to make sure we drain
  *  the entire HTTP request and nothing more.
  */
 
@@ -79,13 +79,11 @@ struct sstp_http
     char uuid[64];
 };
 
-
 /*!
  * @brief Called when receive of the HTTP PROXY data is complete
  */
-static void sstp_recv_proxy_complete(sstp_stream_st *client, 
-    sstp_buff_st *buf, void *ctx, status_t status);
-
+static void sstp_recv_proxy_complete(sstp_stream_st *client,
+                                     sstp_buff_st *buf, void *ctx, status_t status);
 
 #if 0
 /*!
@@ -115,8 +113,8 @@ static void sstp_http_recv_hello(sstp_http_st *http)
 }
 #endif
 
-status_t sstp_http_create(sstp_http_st **http, const char *server, 
-    sstp_http_done_fn done_cb, void *uarg, int mode)
+status_t sstp_http_create(sstp_http_st **http, const char *server,
+                          sstp_http_done_fn done_cb, void *uarg, int mode)
 {
     int ret = 0;
 
@@ -128,10 +126,10 @@ status_t sstp_http_create(sstp_http_st **http, const char *server,
     }
 
     /* Set the HTTP context */
-    (*http)->uarg    = uarg;
+    (*http)->uarg = uarg;
     (*http)->done_cb = done_cb;
-    (*http)->server  = server;
-    (*http)->mode    = mode;
+    (*http)->server = server;
+    (*http)->mode = mode;
 
     /* Create the buffer */
     ret = sstp_buff_create(&(*http)->buf, 8192);
@@ -146,7 +144,6 @@ status_t sstp_http_create(sstp_http_st **http, const char *server,
 
     return SSTP_OKAY;
 }
-
 
 void sstp_http_free(sstp_http_st *http)
 {
@@ -173,22 +170,21 @@ void sstp_http_free(sstp_http_st *http)
     }
 
     /* Free the HTTP request */
-    free(http);   
+    free(http);
 }
-
 
 /*!
  * @brief Receive the server hello, check status code
  */
-static void sstp_recv_hello_complete(sstp_stream_st *client, 
-    sstp_buff_st *buf, void *ctx, status_t status)
+static void sstp_recv_hello_complete(sstp_stream_st *client,
+                                     sstp_buff_st *buf, void *ctx, status_t status)
 {
-    sstp_http_st *http = (sstp_http_st*) ctx;
+    sstp_http_st *http = (sstp_http_st *)ctx;
     http_header_st array[7];
     http_header_st *entry;
-    int attr  = 7;
-    int code  = 0;
-    int ret   = 0;
+    int attr = 7;
+    int code = 0;
+    int ret = 0;
 
     /* Handle timeout, error, etc */
     if (SSTP_OKAY != status)
@@ -229,16 +225,15 @@ static void sstp_recv_hello_complete(sstp_stream_st *client,
     status = SSTP_OKAY;
 
 done:
- 
+
     http->done_cb(http->uarg, status);
 }
 
-
-/*! 
+/*!
  * @brief Called once a send operation is complete.
  */
-static void sstp_http_send_complete(sstp_stream_st *stream, sstp_buff_st *buf, 
-        sstp_http_st *http, status_t result)
+static void sstp_http_send_complete(sstp_stream_st *stream, sstp_buff_st *buf,
+                                    sstp_http_st *http, status_t result)
 {
     /* Check the result */
     if (SSTP_OKAY != result)
@@ -248,12 +243,11 @@ static void sstp_http_send_complete(sstp_stream_st *stream, sstp_buff_st *buf,
 
     /* Setup a receiver for HTTP messages */
     sstp_stream_setrecv(stream, sstp_stream_recv, http->buf,
-            (sstp_complete_fn) sstp_recv_hello_complete, http, 60);
+                        (sstp_complete_fn)sstp_recv_hello_complete, http, 60);
 }
 
-
-static void sstp_http_send_proxy_complete(sstp_stream_st *stream, sstp_buff_st *buf, 
-        sstp_http_st *http, status_t result)
+static void sstp_http_send_proxy_complete(sstp_stream_st *stream, sstp_buff_st *buf,
+                                          sstp_http_st *http, status_t result)
 {
     /* Check the result */
     if (SSTP_OKAY != result)
@@ -263,17 +257,17 @@ static void sstp_http_send_proxy_complete(sstp_stream_st *stream, sstp_buff_st *
 
     /* Setup a receiver for HTTP messages */
     sstp_stream_setrecv(stream, sstp_stream_recv_plain, http->buf,
-            (sstp_complete_fn) sstp_recv_proxy_complete, http, 60);
+                        (sstp_complete_fn)sstp_recv_proxy_complete, http, 60);
 }
 
-/*! 
+/*!
  * @brief Send the client hello to the server
  *
- * @par Note: 
+ * @par Note:
  *   Response is expected in 60 seconds
  */
-static status_t sstp_http_send_hello(sstp_http_st *http, 
-        sstp_stream_st *stream)
+static status_t sstp_http_send_hello(sstp_http_st *http,
+                                     sstp_stream_st *stream)
 {
     int ret = 0;
 
@@ -281,7 +275,7 @@ static status_t sstp_http_send_hello(sstp_http_st *http,
 
     /* Add the HTTP header */
     ret = sstp_buff_print(http->buf, "SSTP_DUPLEX_POST %s HTTP/1.1\r\n",
-            SSTP_HTTP_DFLT_PATH);
+                          SSTP_HTTP_DFLT_PATH);
     if (SSTP_OKAY != ret)
     {
         return ret;
@@ -302,18 +296,16 @@ static status_t sstp_http_send_hello(sstp_http_st *http,
     }
 
     /* Add the UUID attribute */
-    ret = sstp_buff_print(http->buf, "SSTPCORRELATIONID: %s\r\n\r\n", 
-            http->uuid, strlen(http->uuid));
+    ret = sstp_buff_print(http->buf, "SSTPCORRELATIONID: %s\r\n\r\n",
+                          http->uuid, strlen(http->uuid));
     if (SSTP_OKAY != ret)
     {
         return ret;
     }
 
     /* Send the buffer */
-    return sstp_stream_send(stream, http->buf, (sstp_complete_fn)
-            sstp_http_send_complete, http, 10);
+    return sstp_stream_send(stream, http->buf, (sstp_complete_fn)sstp_http_send_complete, http, 10);
 }
-
 
 status_t sstp_http_handshake(sstp_http_st *http, sstp_stream_st *stream)
 {
@@ -333,7 +325,7 @@ status_t sstp_http_handshake(sstp_http_st *http, sstp_stream_st *stream)
 
         /* Setup a receiver for HTTP messages */
         sstp_stream_setrecv(stream, sstp_stream_recv, http->buf,
-                (sstp_complete_fn) sstp_recv_hello_complete, http, 60);
+                            (sstp_complete_fn)sstp_recv_hello_complete, http, 60);
         break;
 
     case SSTP_MODE_SERVER:
@@ -345,47 +337,34 @@ status_t sstp_http_handshake(sstp_http_st *http, sstp_stream_st *stream)
     return ret;
 }
 
-
 /*!
- * @brief Perform Basic authentication for now. Support digest in the 
+ * @brief Perform Basic authentication for now. Support digest in the
  *  future.
  */
-static const char *sstp_proxy_basicauth(const char *user, 
-        const char *pass, char *buf, int size)
+static const char *sstp_proxy_basicauth(const char *user,
+                                        const char *pass, char *buf, int size)
 {
-    EVP_ENCODE_CTX ctx;
-    int tot = 0;
-    int len = 0;
-    unsigned char out[255];
-
-    EVP_EncodeInit  (&ctx);
-    EVP_EncodeUpdate(&ctx, out + tot, &len, 
-		(unsigned char*) user, strlen(user));
-    tot += len;
-    EVP_EncodeUpdate(&ctx, out + tot, &len, 
-		(unsigned char*) ":", 1);
-    tot += len;
-    EVP_EncodeUpdate(&ctx, out + tot, &len, 
-		(unsigned char*) pass, strlen(pass));
-    tot += len;
-    EVP_EncodeFinal (&ctx, out + tot, &len);
-    tot += len;
-
+    unsigned char out[512];
+    char in[512];
+    int ilen = snprintf(in, sizeof(in), "%s:%s", user, pass);
+    int elen = EVP_EncodeBlock(out, (unsigned char *)in, ilen);
+    if (elen < (int)sizeof(out))
+        out[elen] = '\0';
+    else
+        out[sizeof(out) - 1] = '\0';
     snprintf(buf, size, "Basic %s", out);
     return (buf);
 }
-
 
 /*!
  * @brief Update with the credentials
  */
 void sstp_http_setcreds(sstp_http_st *http, const char *user,
-        const char *pass)
+                        const char *pass)
 {
     http->user = strdup(user);
     http->pass = strdup(pass);
 }
-
 
 /*!
  * @brief Set the UUID of the connection
@@ -395,19 +374,18 @@ void sstp_http_setuuid(sstp_http_st *http, const char *uuid)
     strncpy(http->uuid, uuid, sizeof(http->uuid));
 }
 
-
 /*!
  * @brief Called when receive is complete from the proxy.
  */
-static void sstp_recv_proxy_complete(sstp_stream_st *client, 
-    sstp_buff_st *buf, void *ctx, status_t status)
+static void sstp_recv_proxy_complete(sstp_stream_st *client,
+                                     sstp_buff_st *buf, void *ctx, status_t status)
 {
-    sstp_http_st *http = (sstp_http_st*) ctx;
+    sstp_http_st *http = (sstp_http_st *)ctx;
     http_header_st array[15];
     http_header_st *entry;
-    int attr  = 15;
-    int code  = 0;
-    int ret   = 0;
+    int attr = 15;
+    int code = 0;
+    int ret = 0;
 
     /* TODO: Handle timeout, error, etc */
     if (SSTP_OKAY != status)
@@ -422,7 +400,7 @@ static void sstp_recv_proxy_complete(sstp_stream_st *client,
         log_err("Could not parse the HTTP headers");
         goto done;
     }
-    
+
     switch (code)
     {
     case 200:
@@ -430,12 +408,12 @@ static void sstp_recv_proxy_complete(sstp_stream_st *client,
         break;
 
     case 407:
-        
+
         /* Get the Content-Length if specified */
         entry = sstp_http_get_header("Proxy-Authenticate", attr, array);
         if (strncasecmp(entry->value, "Basic", 5))
         {
-            log_err("Received unsupported authentication: %s", 
+            log_err("Received unsupported authentication: %s",
                     entry->value);
             status = SSTP_FAIL;
             break;
@@ -455,7 +433,6 @@ done:
     http->done_cb(http->uarg, status);
 }
 
-
 /*!
  * @brief Called when we want to initiate a connection to the proxy
  */
@@ -468,7 +445,7 @@ status_t sstp_http_proxy(sstp_http_st *http, sstp_stream_st *stream)
 
     /* Format the buffer */
     ret = sstp_buff_print(http->buf, SSTP_HTTP_PROXY_CONNECT_FMT,
-            http->server, PACKAGE);
+                          http->server, PACKAGE);
     if (SSTP_OKAY != ret)
     {
         goto done;
@@ -498,8 +475,7 @@ status_t sstp_http_proxy(sstp_http_st *http, sstp_stream_st *stream)
     }
 
     /* Send the HTTP header */
-    ret = sstp_stream_send_plain(stream, http->buf, (sstp_complete_fn)
-                sstp_http_send_proxy_complete, http, 10);
+    ret = sstp_stream_send_plain(stream, http->buf, (sstp_complete_fn)sstp_http_send_proxy_complete, http, 10);
     if (SSTP_OKAY != ret)
     {
         goto done;
@@ -507,9 +483,8 @@ status_t sstp_http_proxy(sstp_http_st *http, sstp_stream_st *stream)
 
     /* Configure the receiver */
     sstp_stream_setrecv(stream, sstp_stream_recv_plain, http->buf,
-            (sstp_complete_fn) sstp_recv_proxy_complete, http, 60);
+                        (sstp_complete_fn)sstp_recv_proxy_complete, http, 60);
 done:
-    
+
     return ret;
 }
-

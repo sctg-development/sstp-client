@@ -1,0 +1,89 @@
+# Ignore build artifacts and temporary files
+
+# Object and binary files
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.a
+*.la
+*.lo
+*.lai
+*.exe
+*.out
+*.elf
+*.dSYM/
+
+# libtool and automake
+.libs/
+.deps/
+
+# Autotools / configure outputs
+autom4te.cache/
+config.log
+config.status
+config.cache
+Makefile
+Makefile.in
+configure
+
+# Build directories
+build/
+_build/
+
+# Editor/IDE files
+*~
+*.swp
+*.swo
+*.swn
+*.bak
+*.orig
+*.rej
+.tags
+ctags
+*.iml
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Logs, coverage and tests
+*.log
+coverage/
+*.gcno
+*.gcda
+*.gcov
+.pytest_cache/
+
+# Packages and virtualenvs
+node_modules/
+venv/
+.env
+.envrc
+
+# Patches and diffs
+*.patch
+*.diff
+
+# Core dumps
+core
+core.*
+
+# Misc
+*.class
+*.jar
+
+# Project-specific binaries
+sstpc
+
+# End of file
+config.h
+libtool
+sstp-client-1.0.pc
+stamp-h1
+test-driver

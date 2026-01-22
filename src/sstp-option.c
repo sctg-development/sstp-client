@@ -3,7 +3,7 @@
  *
  * @file sstp-options.c
  *
- * @author Copyright (C) 2011 Eivind Naess, 
+ * @author Copyright (C) 2011 Eivind Naess,
  *      All Rights Reserved
  *
  * @par License:
@@ -32,7 +32,6 @@
 
 #include "sstp-private.h"
 
-
 void sstp_die(const char *message, int code, ...)
 {
     va_list list;
@@ -41,14 +40,14 @@ void sstp_die(const char *message, int code, ...)
 
     /* Make sure we log the message to syslog, etc */
     va_start(list, code);
-    vsnprintf(buff, sizeof(buff)-1, message, list);
+    vsnprintf(buff, sizeof(buff) - 1, message, list);
     va_end(list);
-    sstp_log_msg(SSTP_LOG_ERR, __FILE__, __LINE__, "%s", buff); 
+    sstp_log_msg(SSTP_LOG_ERR, __FILE__, __LINE__, "%s", buff);
 
     /* Format the error string */
-    snprintf(format, sizeof(format)-1, "**Error: %s, (%d)\n", 
-            message, code);
-    
+    snprintf(format, sizeof(format) - 1, "**Error: %s, (%d)\n",
+             message, code);
+
     /* Format the message */
     va_start(list, code);
     vprintf(format, list);
@@ -58,21 +57,20 @@ void sstp_die(const char *message, int code, ...)
     exit(code);
 }
 
-
-void sstp_usage_die(const char *prog, int code, 
-    const char *message, ...)
+void sstp_usage_die(const char *prog, int code,
+                    const char *message, ...)
 {
     va_list list;
-    char format[SSTP_DFLT_BUFSZ+1];
+    char format[SSTP_DFLT_BUFSZ + 1];
     int ret = (-1);
 
     printf("%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
-    printf("Copyright (C) Eivind Naess 2011-2012, All Rights Reserved\n\n");
+    printf("Copyright (C) Eivind Naess 2011-2012, All Rights Reserved\n");
+    printf("Copyright (C) Ronan Le Meillat - SCTG Development 2026, All Rights Reserved\n\n");
     printf("License GPLv2+: GNU GPL version 2 or later <http://gnu.org/licenses/gpl.html>\n");
     printf("This is free software: you are free to change and redistribute it.\n");
     printf("There is NO WARRANTY, to the extent permitted by law.\n\n");
     printf("Report Bugs:\n  %s\n\n", PACKAGE_BUGREPORT);
-
 
     /* Print the usage text */
     printf("Usage: %s <sstp-options> <hostname> [[--] <pppd-options>]\n", prog);
@@ -99,23 +97,21 @@ void sstp_usage_die(const char *prog, int code,
     sstp_log_usage();
 
     /* Format the message */
-    ret  = snprintf(format, SSTP_DFLT_BUFSZ, "**Error: Could not execute `%s', %s (%d)\n",
-            prog, message, code);
+    ret = snprintf(format, SSTP_DFLT_BUFSZ, "**Error: Could not execute `%s', %s (%d)\n",
+                   prog, message, code);
     if (ret >= sizeof(format))
     {
         format[SSTP_DFLT_BUFSZ] = '\0';
     }
 
     /* Print the error */
-    va_start(list, message);   
+    va_start(list, message);
     vprintf(format, list);
     va_end(list);
-
 
     /* Exit */
     exit(code);
 }
-
 
 /*!
  * @brief Print the version
@@ -125,7 +121,6 @@ static void sstp_print_version(const char *prog)
     printf("%s version %s\n", PACKAGE_NAME, PACKAGE_VERSION);
     exit(0);
 }
-
 
 /*!
  * @brief Scribble on an input argument to avoid having it appear in /proc/self/cmdline
@@ -137,7 +132,6 @@ static void sstp_scramble(char *arg)
         *arg++ = 'x';
     }
 }
-
 
 /*!
  * @brief Handle the individual options here
@@ -174,7 +168,7 @@ static void sstp_parse_option(sstp_option_st *ctx, int argc, char **argv, int in
         ctx->enable |= SSTP_OPT_NOLAUNCH;
         break;
 
-    case 7: 
+    case 7:
         ctx->password = strdup(optarg);
         sstp_scramble(optarg);
         break;
@@ -192,7 +186,7 @@ static void sstp_parse_option(sstp_option_st *ctx, int argc, char **argv, int in
         break;
 
     case 11:
-        ctx->proxy = strdup(optarg);    // May contain user/pass.
+        ctx->proxy = strdup(optarg); // May contain user/pass.
         sstp_scramble(optarg);
         break;
 
@@ -205,8 +199,8 @@ static void sstp_parse_option(sstp_option_st *ctx, int argc, char **argv, int in
         break;
 
     case 14:
-	if (getuid() != 0)
-           sstp_die("Can only save server route when run as root", -1);
+        if (getuid() != 0)
+            sstp_die("Can only save server route when run as root", -1);
         ctx->enable |= SSTP_OPT_SAVEROUTE;
         break;
 
@@ -217,7 +211,6 @@ static void sstp_parse_option(sstp_option_st *ctx, int argc, char **argv, int in
 
     return;
 }
-
 
 void sstp_option_free(sstp_option_st *ctx)
 {
@@ -258,30 +251,28 @@ void sstp_option_free(sstp_option_st *ctx)
     memset(ctx, 0, sizeof(sstp_option_st));
 }
 
-
 int sstp_parse_argv(sstp_option_st *ctx, int argc, char **argv)
 {
     int option_index = 0;
-    static struct option option_long[] = 
-    {
-        { "ca-cert",        required_argument, NULL,  0  }, /* 0 */
-        { "ca-path",        required_argument, NULL,  0  },
-        { "cert-warn",      no_argument,       NULL,  0  },
-        { "debug",          no_argument,       NULL,  0  },
-        { "help",           no_argument,       NULL,  0  },
-        { "ipparam",        required_argument, NULL,  0  }, /* 5 */
-        { "nolaunchpppd",   no_argument,       NULL,  0  },
-        { "password",       required_argument, NULL,  0  },
-        { "priv-user",      required_argument, NULL,  0  },
-        { "priv-group",     required_argument, NULL,  0  },
-        { "priv-dir",       required_argument, NULL,  0  }, /* 10 */
-        { "proxy",          required_argument, NULL,  0  },
-        { "user",           required_argument, NULL,  0  },
-        { "uuid",           required_argument, NULL,  0  },
-        { "save-server-route", no_argument,    NULL,  0  },
-        { "version",        no_argument,       NULL, 'v' },
-        { 0, 0, 0, 0 }
-    };
+    static struct option option_long[] =
+        {
+            {"ca-cert", required_argument, NULL, 0}, /* 0 */
+            {"ca-path", required_argument, NULL, 0},
+            {"cert-warn", no_argument, NULL, 0},
+            {"debug", no_argument, NULL, 0},
+            {"help", no_argument, NULL, 0},
+            {"ipparam", required_argument, NULL, 0}, /* 5 */
+            {"nolaunchpppd", no_argument, NULL, 0},
+            {"password", required_argument, NULL, 0},
+            {"priv-user", required_argument, NULL, 0},
+            {"priv-group", required_argument, NULL, 0},
+            {"priv-dir", required_argument, NULL, 0}, /* 10 */
+            {"proxy", required_argument, NULL, 0},
+            {"user", required_argument, NULL, 0},
+            {"uuid", required_argument, NULL, 0},
+            {"save-server-route", no_argument, NULL, 0},
+            {"version", no_argument, NULL, 'v'},
+            {0, 0, 0, 0}};
 
     /* Clear the option structure */
     memset(ctx, 0, sizeof(sstp_option_st));
@@ -363,5 +354,3 @@ int sstp_parse_argv(sstp_option_st *ctx, int argc, char **argv)
 
     return 0;
 }
-
-

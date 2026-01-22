@@ -87,3 +87,13 @@ libtool
 sstp-client-1.0.pc
 stamp-h1
 test-driver
+src/utest_chap
+src/utest_chap.trs
+src/utest_cmac
+src/utest_cmac.trs
+src/utest_fcs
+src/utest_fcs.trs
+src/utest_route
+src/utest_route.trs
+src/utest_task
+src/utest_task.trs

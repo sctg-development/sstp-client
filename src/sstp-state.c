@@ -464,7 +464,8 @@ static void sstp_state_recv(sstp_stream_st *stream, sstp_buff_st *buf,
 
     case SSTP_FAIL:
     default:
-        ctx->state_cb(ctx->uarg, status);
+        /* Map stream status errors to a state machine abort event */
+        ctx->state_cb(ctx->uarg, SSTP_CALL_ABORT);
         return;
     }
 

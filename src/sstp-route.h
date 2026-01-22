@@ -3,7 +3,7 @@
  *
  * @file sstp-route.h
  *
- * @author Copyright (C) 2011 Eivind Naess, 
+ * @author Copyright (C) 2011 Eivind Naess,
  *      All Rights Reserved
  *
  * @par License:
@@ -30,13 +30,12 @@
 struct sstp_route_ctx;
 typedef struct sstp_route_ctx sstp_route_ctx_st;
 
-
 #if defined(HAVE_NETLINK) || defined(__APPLE__)
 
-/*! 
+/*!
  * @brief Holds either a ipv4 or an ipv6 address
  */
-typedef union 
+typedef union
 {
     /* Access the IPv4 address */
     struct in_addr in4;
@@ -49,14 +48,15 @@ typedef union
 /*!
  * @brief Data structure to hold the route information
  */
-typedef struct 
+typedef struct
 {
     /* Specify which attributes are set in this structure */
-    struct {
-        int src : 1;
-        int dst : 1;
-        int gwy : 1;
-        int oif : 1;
+    struct
+    {
+        unsigned int src : 1;
+        unsigned int dst : 1;
+        unsigned int gwy : 1;
+        unsigned int oif : 1;
     } have;
 
     /* The family, AF_UNSPEC, AF_INET, AF_INET6 */
@@ -82,7 +82,7 @@ typedef struct
 
 } sstp_route_st;
 
-#else   /* #ifdef HAVE_NETLINK */
+#else /* #ifdef HAVE_NETLINK */
 
 typedef struct
 {
@@ -90,39 +90,32 @@ typedef struct
 
 } sstp_route_st;
 
-#endif  /* #ifdef HAVE_NETLINK */
-
+#endif /* #ifdef HAVE_NETLINK */
 
 /*!
  * @brief Create or replace an existing route to a destination
  */
 int sstp_route_replace(sstp_route_ctx_st *ctx, sstp_route_st *route);
 
-
 /*!
  * @brief Delete a route from the route table
  */
 int sstp_route_delete(sstp_route_ctx_st *ctx, sstp_route_st *route);
 
-
-/*! 
+/*!
  * @brief Obtain a particular route to a destination
  */
 int sstp_route_get(sstp_route_ctx_st *ctx, struct sockaddr *dst,
-        sstp_route_st *route);
-
+                   sstp_route_st *route);
 
 /*!
  * @brief Initialize the route module
  */
 int sstp_route_init(sstp_route_ctx_st **ctx);
 
-
 /*!
  * @brief Cleanup the route context
  */
 void sstp_route_done(sstp_route_ctx_st *ctx);
 
-
 #endif /* #ifndef __SSTP_ROUTE_H__ */
-

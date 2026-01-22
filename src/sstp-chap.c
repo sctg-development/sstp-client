@@ -28,7 +28,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <openssl/sha.h>
-#include <openssl/md4.h>
+#include "md4.h"
 #include <openssl/evp.h>
 #include "sstp-private.h"
 #include "sstp-chap.h"
@@ -59,64 +59,25 @@ static int sstp_chap_hash_pass(const char *pass, int len,
     uint8_t buf[512] = {};
     uint8_t inx;
 
-    EVP_MD_CTX *mdctx = NULL;
-    const EVP_MD *md = NULL;
-    unsigned int outlen = 0;
+    MD4_CTX ctx;
 
     if (len > 255)
-    {
         return -1;
-    }
 
     /* Convert to unicode */
     for (inx = 0; inx < len; inx++)
-    {
         buf[(inx << 1)] = pass[inx];
-    }
 
-    /* Use EVP with MD4 */
-    md = EVP_md4();
-    if (md == NULL)
-        return -1;
+    /* Use local MD4 implementation (RFC1320) */
+    MD4_Init(&ctx);
+    MD4_Update(&ctx, buf, (size_t)(len << 1));
+    MD4_Final(hash, &ctx);
 
-    mdctx = EVP_MD_CTX_new();
-    if (mdctx == NULL)
-        return -1;
+    /* Double MD4 */
+    MD4_Init(&ctx);
+    MD4_Update(&ctx, hash, 16);
+    MD4_Final(hash, &ctx);
 
-    if (EVP_DigestInit_ex(mdctx, md, NULL) != 1)
-    {
-        EVP_MD_CTX_free(mdctx);
-        return -1;
-    }
-    if (EVP_DigestUpdate(mdctx, buf, (size_t)(len << 1)) != 1)
-    {
-        EVP_MD_CTX_free(mdctx);
-        return -1;
-    }
-    if (EVP_DigestFinal_ex(mdctx, hash, &outlen) != 1)
-    {
-        EVP_MD_CTX_free(mdctx);
-        return -1;
-    }
-
-    /* Digest the hash again (double MD4) */
-    if (EVP_DigestInit_ex(mdctx, md, NULL) != 1)
-    {
-        EVP_MD_CTX_free(mdctx);
-        return -1;
-    }
-    if (EVP_DigestUpdate(mdctx, hash, 16) != 1)
-    {
-        EVP_MD_CTX_free(mdctx);
-        return -1;
-    }
-    if (EVP_DigestFinal_ex(mdctx, hash, &outlen) != 1)
-    {
-        EVP_MD_CTX_free(mdctx);
-        return -1;
-    }
-
-    EVP_MD_CTX_free(mdctx);
     return 0;
 }
 

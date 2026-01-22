@@ -9,7 +9,8 @@ utest_task_SOURCES  = sstp-task.c
 utest_task_CFLAGS   = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_TASK=1
 utest_cmac_SOURCES  = sstp-cmac.c
 utest_cmac_CFLAGS   = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_CMAC=1
-utest_chap_SOURCES  = sstp-chap.c
+utest_chap_SOURCES  = sstp-chap.c md4.c
+utest_md4_SOURCES   = utest_md4.c md4.c
 utest_chap_CFLAGS   = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_CHAP=1
 utest_fcs_SOURCES   = sstp-fcs.c
 utest_fcs_CFLAGS    = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_FCS=1
@@ -21,7 +22,8 @@ check_PROGRAMS      =   \
     utest_cmac          \
     utest_chap          \
     utest_fcs           \
-    utest_route
+    utest_route         \
+    utest_md4
 
 TESTS= $(check_PROGRAMS)
 
@@ -40,7 +42,8 @@ sstpc_SOURCES =         \
     sstp-state.c        \
     sstp-chap.c         \
     sstp-route.c        \
-    sstp-fcs.c
+    sstp-fcs.c          \
+    md4.c
 
 noinst_HEADERS  =       \
     sstp-buff.h         \

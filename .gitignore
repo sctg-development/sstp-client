@@ -97,3 +97,5 @@ src/utest_route
 src/utest_route.trs
 src/utest_task
 src/utest_task.trs
+src/utest_md4
+src/utest_md4.trs

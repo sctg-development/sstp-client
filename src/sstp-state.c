@@ -78,7 +78,6 @@ struct sstp_state
 
     /*! Stored CHAP context (used when no pppd/plugin is running) */
     sstp_chap_st chap; // holds challenge/nt_response etc, filled when we handle CHAP inline
-
 };
 
 void sstp_state_set_forward(sstp_state_st *state, sstp_state_forward_fn forward, void *arg)

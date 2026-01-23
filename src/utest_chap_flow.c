@@ -97,7 +97,8 @@ int main(void)
     {
         if (skey[i] != 0 || rkey[i] != 0)
         {
-            any = 1; break;
+            any = 1;
+            break;
         }
     }
 

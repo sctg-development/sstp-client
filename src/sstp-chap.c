@@ -376,14 +376,18 @@ static void sstp_des_7_to_8(const uint8_t in[7], uint8_t out[8])
 #else
         int ones = 0;
         unsigned char tmp = b;
-        while (tmp) { ones += tmp & 1; tmp >>= 1; }
+        while (tmp)
+        {
+            ones += tmp & 1;
+            tmp >>= 1;
+        }
 #endif
         if ((ones & 1) == 0)
             out[i] |= 0x01;
         else
             out[i] &= 0xFE;
     }
-} 
+}
 
 /*
  * Generate NT-Response from 8-byte challenge and 16-byte password hash

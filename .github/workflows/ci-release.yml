@@ -1,0 +1,199 @@
+name: Build & Release (multi-platform)
+
+on:
+    release:
+        types: [published]
+    workflow_dispatch:
+
+permissions:
+    contents: write # needed to create releases and upload assets
+
+env:
+    PKG_NAME: sstp-client
+
+jobs:
+    build:
+        name: Build ${{ matrix.name }}
+        runs-on: ${{ matrix.runner }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - name: ubuntu-24.04-amd64
+                      runner: ubuntu-24.04
+                      arch: amd64
+                      target: x86_64-unknown-linux-gnu
+                      ext: tar.gz
+                    - name: ubuntu-24.04-arm64
+                      runner: ubuntu-24.04-arm
+                      arch: arm64
+                      target: aarch64-unknown-linux-gnu
+                      ext: tar.gz
+                    - name: macos-amd64
+                      runner: macos-15-intel
+                      arch: amd64
+                      target: x86_64-apple-darwin
+                      ext: tar.gz
+                    - name: macos-arm64
+                      runner: macos-latest
+                      arch: arm64
+                      target: aarch64-apple-darwin
+                      ext: tar.gz
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Set version
+              id: vars
+              shell: bash
+              run: |
+                  if [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
+                    TAG=$(jq -r .release.tag_name < "$GITHUB_EVENT_PATH")
+                    echo "version=$TAG" >> $GITHUB_OUTPUT
+                    echo "is_release=true" >> $GITHUB_OUTPUT
+                  else
+                    VER="${GITHUB_RUN_NUMBER}-nightly"
+                    echo "version=$VER" >> $GITHUB_OUTPUT
+                    echo "is_release=false" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Install build dependencies
+              shell: bash
+              run: |
+                  if [[ "$(uname)" == "Linux" ]]; then
+                    sudo apt-get update
+                    sudo apt-get install -y build-essential autoconf automake libtool pkg-config libssl-dev ca-certificates curl jq
+                  else
+                    brew update
+                    brew install autoconf automake libtool pkg-config openssl@3 jq
+                    export PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig"
+                    export LDFLAGS="-L$(brew --prefix openssl@3)/lib"
+                    export CPPFLAGS="-I$(brew --prefix openssl@3)/include"
+                    echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+                    echo "LDFLAGS=$LDFLAGS" >> $GITHUB_ENV
+                    echo "CPPFLAGS=$CPPFLAGS" >> $GITHUB_ENV
+                  fi
+
+            - name: Prepare build (autoreconf)
+              shell: bash
+              run: |
+                  autoreconf -fi
+
+            - name: Configure
+              shell: bash
+              run: |
+                  ./configure --disable-ppp-plugin --prefix=/usr
+
+            - name: Build & install into stagedir
+              shell: bash
+              run: |
+                  if [[ "$(uname)" == "Linux" ]]; then
+                    MAKEFLAGS=-j$(nproc)
+                  else
+                    MAKEFLAGS=-j$(sysctl -n hw.logicalcpu)
+                  fi
+                  make $MAKEFLAGS
+                  rm -rf dist
+                  make install DESTDIR=$PWD/dist
+
+            - name: Package release tarball
+              id: package
+              shell: bash
+              run: |
+                  mkdir -p release
+                  PKGDIR="${PKG_NAME}-${{ steps.vars.outputs.version }}-${{ matrix.name }}"
+                  mkdir -p "release/$PKGDIR"
+                  # copy installed files
+                  cp -a dist/* "release/$PKGDIR/" || true
+                  # include a small metadata file
+                  cat > "release/$PKGDIR/RELEASE_INFO" <<-EOF
+                  name: $PKG_NAME
+                  version: ${{ steps.vars.outputs.version }}
+                  flavor: ${{ matrix.name }}
+                  runner: ${{ matrix.runner }}
+                  arch: ${{ matrix.arch }}
+                  target: ${{ matrix.target }}
+                  built_at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+                  EOF
+                  ARTIFACT="${PKGDIR}.${{ matrix.ext }}"
+                  tar -C release -czf "$ARTIFACT" "$PKGDIR"
+                  echo "artifact=$ARTIFACT" >> "$GITHUB_OUTPUT"
+
+            - name: Upload built artifact for release step
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ matrix.name }}
+                  path: ${{ steps.package.outputs.artifact }}
+
+    release:
+        name: Create / Upload Release
+        runs-on: ubuntu-24.04
+        needs: build
+        steps:
+            - name: Download built artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  # downloads all artifacts from previous job(s)
+                  path: artifacts
+
+            - name: Prepare tag / release details
+              id: relvars
+              shell: bash
+              run: |
+                  if [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
+                    TAG=$(jq -r .release.tag_name < "$GITHUB_EVENT_PATH")
+                    RELEASE_ID=$(jq -r .release.id < "$GITHUB_EVENT_PATH")
+                    echo "tag=$TAG" >> $GITHUB_OUTPUT
+                    echo "release_id=$RELEASE_ID" >> $GITHUB_OUTPUT
+                    echo "created=false" >> $GITHUB_OUTPUT
+                  else
+                    TAG="nightly-${GITHUB_RUN_NUMBER}"
+                    echo "tag=$TAG" >> $GITHUB_OUTPUT
+                    echo "created=true" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Create release (if needed)
+              if: ${{ steps.relvars.outputs.created == 'true' }}
+              id: create_release
+              uses: actions/create-release@v1
+              with:
+                  tag_name: ${{ steps.relvars.outputs.tag }}
+                  release_name: ${{ steps.relvars.outputs.tag }}
+                  body: "Nightly build from workflow run ${{ github.run_id }}"
+                  draft: false
+                  prerelease: true
+
+            - name: Set release id (existing or newly created)
+              id: set_release_id
+              shell: bash
+              run: |
+                  if [[ "${{ steps.relvars.outputs.created }}" == "true" ]]; then
+                    ID=$(jq -r .id <<< '${{ steps.create_release.outputs.response }}')
+                    echo "release_id=$ID" >> $GITHUB_OUTPUT
+                  else
+                    echo "release_id=${{ steps.relvars.outputs.release_id }}" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Skip legacy upload (use gh CLI later)
+              run: |
+                  echo "Legacy upload step removed; artifacts will be zipped and uploaded using gh CLI."
+
+            - name: Zip all artifacts into a single file for the release
+              if: always()
+              shell: bash
+              run: |
+                  cd artifacts
+                  zip -r ../release-artifacts-${{ github.run_id }}.zip .
+
+            - name: Upload the zip to release using gh
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              shell: bash
+              run: |
+                  # upload the release zip to the release identified by tag
+                  gh release upload "${{ steps.relvars.outputs.tag }}" ./release-artifacts-${{ github.run_id }}.zip --clobber
+
+            - name: Final message
+              run: |
+                  echo "Release ${{ steps.relvars.outputs.tag }}: assets uploaded."

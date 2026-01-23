@@ -197,28 +197,3 @@ jobs:
             echo "Uploading: $ARCHIVES"
             gh release upload "$TAG" $ARCHIVES --clobber
           fi
-
-      - name: Show release URL
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          gh release view --json url --jq '.url' ${{ env.TAG }}
-      - name: Zip all artifacts into a single file for the release
-        if: always()
-        shell: bash
-        run: |
-          cd artifacts
-          zip -r ../release-artifacts-${{ github.run_id }}.zip .
-
-      - name: Upload the zip to release using gh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          # upload the release zip to the release identified by tag
-          gh release upload "${{ steps.relvars.outputs.tag }}" ./release-artifacts-${{ github.run_id }}.zip --clobber
-
-      - name: Final message
-        run: |
-          echo "Release ${{ steps.relvars.outputs.tag }}: assets uploaded."

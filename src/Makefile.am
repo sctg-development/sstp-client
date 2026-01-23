@@ -11,11 +11,16 @@ utest_cmac_SOURCES  = sstp-cmac.c
 utest_cmac_CFLAGS   = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_CMAC=1
 utest_chap_SOURCES  = sstp-chap.c md4.c
 utest_md4_SOURCES   = utest_md4.c md4.c
+utest_mschap_SOURCES = utest_mschap.c sstp-chap.c md4.c
 utest_chap_CFLAGS   = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_CHAP=1
 utest_fcs_SOURCES   = sstp-fcs.c
 utest_fcs_CFLAGS    = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_FCS=1
-utest_route_SOURCES = sstp-route.c
-utest_route_CFLAGS  = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_ROUTE=1
+utest_mschap_CFLAGS  = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_MSCHAP=1
+utest_mschap_LDADD   = libsstp-log/libsstp_log.la libsstp-api/libsstp_api.la libsstp-compat/libsstp_compat.la
+
+utest_chap_flow_SOURCES = utest_chap_flow.c sstp-chap.c md4.c
+utest_chap_flow_CFLAGS  = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_MSCHAP_FLOW=1
+utest_chap_flow_LDADD   = libsstp-log/libsstp_log.la libsstp-api/libsstp_api.la libsstp-compat/libsstp_compat.la
 
 check_PROGRAMS      =   \
     utest_task          \
@@ -23,9 +28,14 @@ check_PROGRAMS      =   \
     utest_chap          \
     utest_fcs           \
     utest_route         \
-    utest_md4
+    utest_md4           \
+    utest_mschap        \
+    utest_chap_flow
 
 TESTS= $(check_PROGRAMS)
+utest_route_SOURCES = sstp-route.c
+utest_route_CFLAGS  = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_ROUTE=1
+
 
 sstpc_SOURCES =         \
     sstp-client.c       \

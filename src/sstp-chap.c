@@ -3,7 +3,7 @@
  *
  * @file sstp-chap.c
  *
- * @author Copyright (C) 2011 Eivind Naess,
+ * @author Copyright (C) 2011 Eivind Naess, 2026 Ronan Le Meillat - SCTG Development,
  *      All Rights Reserved
  *
  * @par License:
@@ -30,6 +30,8 @@
 #include <openssl/sha.h>
 #include "md4.h"
 #include <openssl/evp.h>
+#include <openssl/err.h>
+#include <openssl/des.h>
 #include "sstp-private.h"
 #include "sstp-chap.h"
 
@@ -265,6 +267,291 @@ static int sstp_chap_hash_session(uint8_t key[16], uint8_t master[16],
 
     /* Keep the 16 first bytes of the digest */
     memcpy(key, buf, 16);
+    return 0;
+}
+
+/*
+ * Compute NT Password Hash: MD4(Unicode(password))
+ */
+int sstp_chap_nt_password_hash(const char *pass, uint8_t hash[16])
+{
+    uint8_t buf[512] = {};
+    int len = (int)strlen(pass);
+    int inx;
+    MD4_CTX ctx;
+
+    if (len > 255)
+        return -1;
+
+    /* Convert to unicode (little endian) */
+    for (inx = 0; inx < len; inx++)
+    {
+        buf[(inx << 1)] = (uint8_t)pass[inx];
+        buf[(inx << 1) + 1] = 0x00;
+    }
+
+    /* Single MD4 */
+    MD4_Init(&ctx);
+    MD4_Update(&ctx, buf, (size_t)(len << 1));
+    MD4_Final(hash, &ctx);
+
+    return 0;
+}
+
+/*
+ * ChallengeHash = SHA1(PeerChallenge || AuthChallenge || Username) -> first 8 bytes
+ */
+int sstp_chap_challenge_hash(const uint8_t peer[16], const uint8_t auth[16], const char *user, uint8_t challenge[8])
+{
+    EVP_MD_CTX *mdctx = NULL;
+    const EVP_MD *md = NULL;
+    unsigned int outlen = 0;
+    uint8_t buf[SHA_DIGEST_LENGTH];
+    size_t ulen = strlen(user);
+
+    md = EVP_sha1();
+    if (md == NULL)
+        return -1;
+
+    mdctx = EVP_MD_CTX_new();
+    if (mdctx == NULL)
+        return -1;
+
+    if (EVP_DigestInit_ex(mdctx, md, NULL) != 1)
+    {
+        EVP_MD_CTX_free(mdctx);
+        return -1;
+    }
+
+    if (EVP_DigestUpdate(mdctx, peer, 16) != 1)
+    {
+        EVP_MD_CTX_free(mdctx);
+        return -1;
+    }
+
+    if (EVP_DigestUpdate(mdctx, auth, 16) != 1)
+    {
+        EVP_MD_CTX_free(mdctx);
+        return -1;
+    }
+
+    if (ulen && EVP_DigestUpdate(mdctx, user, ulen) != 1)
+    {
+        EVP_MD_CTX_free(mdctx);
+        return -1;
+    }
+
+    if (EVP_DigestFinal_ex(mdctx, buf, &outlen) != 1)
+    {
+        EVP_MD_CTX_free(mdctx);
+        return -1;
+    }
+
+    EVP_MD_CTX_free(mdctx);
+
+    memcpy(challenge, buf, 8);
+    return 0;
+}
+
+/*
+ * Helper: Convert 7 bytes -> 8-byte DES key with odd parity (parity bit is LSB)
+ */
+static void sstp_des_7_to_8(const uint8_t in[7], uint8_t out[8])
+{
+    out[0] = in[0] & 0xFE;
+    out[1] = ((in[0] << 7) | (in[1] >> 1)) & 0xFE;
+    out[2] = ((in[1] << 6) | (in[2] >> 2)) & 0xFE;
+    out[3] = ((in[2] << 5) | (in[3] >> 3)) & 0xFE;
+    out[4] = ((in[3] << 4) | (in[4] >> 4)) & 0xFE;
+    out[5] = ((in[4] << 3) | (in[5] >> 5)) & 0xFE;
+    out[6] = ((in[5] << 2) | (in[6] >> 6)) & 0xFE;
+    out[7] = (in[6] << 1) & 0xFE;
+
+    /* Set odd parity for each byte: if parity of upper 7 bits is even set LSB to 1 */
+    for (int i = 0; i < 8; i++)
+    {
+        unsigned char b = out[i] & 0xFE; /* clear parity bit */
+#ifdef __GNUC__
+        int ones = __builtin_popcount((unsigned int)b);
+#else
+        int ones = 0;
+        unsigned char tmp = b;
+        while (tmp) { ones += tmp & 1; tmp >>= 1; }
+#endif
+        if ((ones & 1) == 0)
+            out[i] |= 0x01;
+        else
+            out[i] &= 0xFE;
+    }
+} 
+
+/*
+ * Generate NT-Response from 8-byte challenge and 16-byte password hash
+ */
+int sstp_chap_generate_nt_response(const uint8_t challenge[8], const uint8_t password_hash[16], uint8_t nt_response[24])
+{
+    uint8_t zpwd[21];
+    uint8_t key8[8];
+    uint8_t outbuf[16];
+    int i;
+
+    memset(zpwd, 0, sizeof(zpwd));
+    memcpy(zpwd, password_hash, 16);
+
+    for (i = 0; i < 3; i++)
+    {
+        /* Expand 7 bytes -> 8-byte DES key with odd parity */
+        sstp_des_7_to_8(zpwd + i * 7, key8);
+
+        /* Expanded key calculated (odd-parity applied) */
+        /* Note: key material is not logged to avoid leaking sensitive data */
+
+        /* Use EVP to perform DES-ECB encryption without padding */
+        const EVP_CIPHER *cipher = EVP_des_ecb();
+        if (!cipher)
+        {
+            /* Fallback: use legacy DES API if EVP cipher isn't available */
+            uint8_t dkey[8];
+            uint8_t dout[8];
+
+            sstp_des_7_to_8(zpwd + i * 7, dkey);
+
+            log_err("EVP_des_ecb not available, using legacy DES");
+
+            /* Use deprecated DES functions but suppress warnings around them */
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+            {
+                DES_cblock keyblk;
+                DES_key_schedule ks;
+                memcpy(&keyblk, dkey, 8);
+                DES_set_key_unchecked(&keyblk, &ks);
+                DES_ecb_encrypt((DES_cblock *)challenge, (DES_cblock *)dout, &ks, DES_ENCRYPT);
+            }
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
+            /* Legacy DES used for this block */
+            log_err("Using legacy DES implementation for NT-Response computation");
+
+            memcpy(nt_response + (i * 8), dout, 8);
+            continue;
+        }
+
+        EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+        if (!ctx)
+        {
+            log_err("EVP_CIPHER_CTX_new failed");
+            return -1;
+        }
+
+        if (EVP_EncryptInit_ex(ctx, cipher, NULL, key8, NULL) != 1)
+        {
+            unsigned long err = ERR_get_error();
+            char buferr[256];
+            ERR_error_string_n(err, buferr, sizeof(buferr));
+            fprintf(stderr, "EVP_EncryptInit_ex failed: %s\n", buferr);
+
+            /* Fallback to legacy DES if EVP cipher init is unsupported */
+            log_err("EVP_EncryptInit_ex failed: %s; falling back to legacy DES", buferr);
+            EVP_CIPHER_CTX_free(ctx);
+
+            uint8_t dkey[8];
+            uint8_t dout[8];
+            sstp_des_7_to_8(zpwd + i * 7, dkey);
+
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+            {
+                DES_cblock keyblk;
+                DES_key_schedule ks;
+                memcpy(&keyblk, dkey, 8);
+                DES_set_key_unchecked(&keyblk, &ks);
+                DES_ecb_encrypt((DES_cblock *)challenge, (DES_cblock *)dout, &ks, DES_ENCRYPT);
+            }
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
+            /* Legacy DES used for this block */
+            log_err("Using legacy DES implementation for NT-Response computation");
+
+            memcpy(nt_response + (i * 8), dout, 8);
+            continue;
+        }
+
+        EVP_CIPHER_CTX_set_padding(ctx, 0);
+
+        int outlen = 0;
+        if (EVP_EncryptUpdate(ctx, outbuf, &outlen, (const unsigned char *)challenge, 8) != 1)
+        {
+            unsigned long err = ERR_get_error();
+            char buferr[256];
+            ERR_error_string_n(err, buferr, sizeof(buferr));
+            fprintf(stderr, "EVP_EncryptUpdate failed: %s\n", buferr);
+            EVP_CIPHER_CTX_free(ctx);
+            return -1;
+        }
+
+        int outlen2 = 0;
+        if (EVP_EncryptFinal_ex(ctx, outbuf + outlen, &outlen2) != 1)
+        {
+            unsigned long err = ERR_get_error();
+            char buferr[256];
+            ERR_error_string_n(err, buferr, sizeof(buferr));
+            fprintf(stderr, "EVP_EncryptFinal_ex failed: %s\n", buferr);
+            EVP_CIPHER_CTX_free(ctx);
+            return -1;
+        }
+
+        EVP_CIPHER_CTX_free(ctx);
+
+        if ((outlen + outlen2) != 8)
+        {
+            log_err("Unexpected DES output length: %d", outlen + outlen2);
+            return -1;
+        }
+
+        /* EVP DES output computed successfully */
+
+        memcpy(nt_response + (i * 8), outbuf, 8);
+    }
+
+    return 0;
+}
+
+/*
+ * High-level MS-CHAPv2 NT-Response generator
+ */
+int sstp_chap_mschapv2_nt_response(const uint8_t peer_challenge[16], const uint8_t auth_challenge[16], const char *user, const char *password, uint8_t nt_response[24])
+{
+    uint8_t password_hash[16];
+    uint8_t challenge[8];
+
+    if (sstp_chap_nt_password_hash(password, password_hash) < 0)
+        return -1;
+
+    if (sstp_chap_challenge_hash(peer_challenge, auth_challenge, user, challenge) < 0)
+        return -1;
+
+    if (sstp_chap_generate_nt_response(challenge, password_hash, nt_response) < 0)
+        return -1;
+
     return 0;
 }
 

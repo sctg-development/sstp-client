@@ -99,3 +99,5 @@ src/utest_task
 src/utest_task.trs
 src/utest_md4
 src/utest_md4.trs
+src/utest_mschap.trs
+src/utest_mschap

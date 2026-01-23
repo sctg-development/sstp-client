@@ -106,6 +106,15 @@ status_t sstp_state_accept(sstp_state_st *ctx);
  */
 void sstp_state_chap_challenge(sstp_state_st *ctx, sstp_chap_st *chap);
 
+/* Test-only: expose PPP frame handler for unit tests */
+#ifdef __SSTP_UNIT_TEST_MSCHAP_FLOW
+int sstp_state_handle_ppp_frame_for_test(sstp_state_st *state, unsigned char *frame, int flen);
+
+/* Test accessors */
+int sstp_state_get_nt_response(sstp_state_st *state, unsigned char out[24]);
+int sstp_state_mppe_keys_set(sstp_state_st *state);
+#endif
+
 
 /*!
  * @brief Return reason for why call was aborted

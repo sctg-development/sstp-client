@@ -24,6 +24,9 @@
 
 #include <config.h>
 #include "sstp-private.h"
+#include "sstp-chap.h"
+#include "sstp-client.h"
+#include <openssl/rand.h>
 
 /*!
  * @brief The context structure for the SSTP state machine
@@ -72,6 +75,10 @@ struct sstp_state
 
     /*! The MPEE receive key for HLAK */
     uint8_t mppe_recv_key[16];
+
+    /*! Stored CHAP context (used when no pppd/plugin is running) */
+    sstp_chap_st chap; // holds challenge/nt_response etc, filled when we handle CHAP inline
+
 };
 
 void sstp_state_set_forward(sstp_state_st *state, sstp_state_forward_fn forward, void *arg)
@@ -97,6 +104,192 @@ static void sstp_state_send_complete(sstp_stream_st *stream,
     return;
 }
 
+/*
+ * Helper: send a PPP frame (raw payload) over the SSTP data channel
+ */
+static status_t sstp_state_send_ppp_frame(sstp_state_st *ctx, const unsigned char *payload, int plen)
+{
+    status_t status = SSTP_FAIL;
+    int flen = (plen << 1) + 4;
+    unsigned char *enc = NULL;
+    int ret = 0;
+
+    enc = alloca(flen);
+    if (!enc)
+        goto done;
+
+    ret = sstp_frame_encode(payload, plen, enc, &flen);
+    if (SSTP_OKAY != ret)
+    {
+        log_err("Could not encode PPP frame");
+        goto done;
+    }
+
+    /* Create SSTP data packet and append encoded frame */
+    ret = sstp_pkt_init(ctx->tx_buf, SSTP_MSG_DATA);
+    if (SSTP_OKAY != ret)
+        goto done;
+
+    if ((ctx->tx_buf->len + flen) > ctx->tx_buf->max)
+    {
+        log_err("TX buffer too small for PPP frame");
+        goto done;
+    }
+
+    memcpy(&ctx->tx_buf->data[ctx->tx_buf->len], enc, flen);
+    ctx->tx_buf->len += flen;
+    sstp_pkt_update(ctx->tx_buf);
+
+    status = sstp_stream_send(ctx->stream, ctx->tx_buf, (sstp_complete_fn)sstp_state_send_complete, ctx, 1);
+
+done:
+    return status;
+}
+
+/*
+ * Helper: handle PPP frames, intercept MS-CHAPv2 challenge/response
+ * Returns 1 if handled (no further forwarding), 0 otherwise.
+ */
+static int sstp_state_handle_ppp_frame(sstp_state_st *state, unsigned char *frame, int flen)
+{
+    uint16_t proto = (frame[0] & 0x10) ? frame[0] : (frame[0] << 8 | frame[1]);
+    const unsigned char *pkt = frame;
+    int plen = flen;
+
+    /* Not an auth CHAP packet? ignore */
+    if (proto != SSTP_PPP_AUTH_CHAP)
+        return 0;
+
+    /* CHAP code at pkt[2], id at pkt[3], value-size at pkt[6], value starts at pkt[7] */
+    unsigned char code = pkt[2];
+    unsigned char id = pkt[3];
+
+    /* We only handle MS-CHAPv2 when running as client without pppd/plugin */
+    if (state->mode != SSTP_MODE_CLIENT)
+        return 0;
+
+    sstp_client_st *client = (sstp_client_st *)state->uarg;
+    if (!client || !client->option.user || !client->option.password)
+        return 0;
+
+    if (code == 0x01)
+    {
+        /* CHAP Challenge: build an MS-CHAPv2 response */
+        size_t vlen = pkt[6] & 0xFF;
+        if (vlen < 16 || (7 + (int)vlen) > plen)
+            return 0;
+
+        uint8_t auth_challenge[16];
+        memcpy(auth_challenge, &pkt[7], 16);
+
+        /* Generate PeerChallenge */
+        uint8_t peer_challenge[16];
+#ifdef __APPLE__
+        arc4random_buf(peer_challenge, sizeof(peer_challenge));
+#else
+        if (RAND_bytes(peer_challenge, sizeof(peer_challenge)) != 1)
+        {
+            log_err("Could not generate peer challenge");
+            return 0;
+        }
+#endif
+
+        /* Compute NT-Response */
+        uint8_t nt_response[24];
+        if (sstp_chap_mschapv2_nt_response(peer_challenge, auth_challenge, client->option.user, client->option.password, nt_response) < 0)
+        {
+            log_err("Failed to compute MS-CHAPv2 NT-Response");
+            return 0;
+        }
+
+        /* Build CHAP Response packet: proto(2) + Code(1=2) + ID + Len(2) + ValSize(1) + Peer(16)+NT(24)+Flag(1)+Name */
+        int name_len = (int)strlen(client->option.user);
+        int val_size = 16 + 24 + 1;
+        int chap_len = 4 + 1 + val_size + name_len;
+        int total_plen = 2 + chap_len; /* include proto */
+        unsigned char *out = malloc(total_plen);
+        if (!out)
+            return 0;
+
+        /* Protocol */
+        out[0] = (unsigned char)((SSTP_PPP_AUTH_CHAP >> 8) & 0xFF);
+        out[1] = (unsigned char)(SSTP_PPP_AUTH_CHAP & 0xFF);
+
+        out[2] = 0x02; /* Response */
+        out[3] = id;   /* same id as challenge */
+        out[4] = (unsigned char)((chap_len >> 8) & 0xFF);
+        out[5] = (unsigned char)(chap_len & 0xFF);
+        out[6] = (unsigned char)val_size;
+
+        /* Value: PeerChallenge */
+        memcpy(&out[7], peer_challenge, 16);
+        /* NT-Response */
+        memcpy(&out[7 + 16], nt_response, 24);
+        /* Flags */
+        out[7 + 16 + 24] = 0x00;
+        /* Username */
+        memcpy(&out[7 + 16 + 24 + 1], client->option.user, name_len);
+
+        /* Store the computed NT-Response into our state chap context so that when server sends Success we can obtain MPPE keys */
+        memset(&state->chap, 0, sizeof(state->chap));
+        memcpy(state->chap.nt_response, nt_response, sizeof(state->chap.nt_response));
+        memcpy(state->chap.challenge, auth_challenge, sizeof(state->chap.challenge));
+
+        /* Send frame */
+        sstp_state_send_ppp_frame(state, out, total_plen);
+        free(out);
+
+        return 1;
+    }
+    else if (code == 0x03)
+    {
+        /* CHAP Success: compute MPPE keys and accept the state */
+        uint8_t skey[16], rkey[16];
+        if (sstp_chap_mppe_get(&state->chap, ((sstp_client_st *)state->uarg)->option.password, skey, rkey, 0) == 0)
+        {
+            sstp_state_mppe_keys(state, skey, sizeof(skey), rkey, sizeof(rkey));
+            /* Now we are authenticated, move to connected state */
+            sstp_state_accept(state);
+        }
+
+        return 1;
+    }
+
+    return 0;
+}
+
+/*
+ * Exported helper: set the CHAP context in state (used by other code paths)
+ */
+void sstp_state_chap_challenge(sstp_state_st *ctx, sstp_chap_st *chap)
+{
+    if (!ctx || !chap)
+        return;
+
+    memcpy(&ctx->chap, chap, sizeof(ctx->chap));
+}
+
+#ifdef __SSTP_UNIT_TEST_MSCHAP_FLOW
+int sstp_state_get_nt_response(sstp_state_st *state, unsigned char out[24])
+{
+    if (!state || !out)
+        return -1;
+    memcpy(out, state->chap.nt_response, 24);
+    return 0;
+}
+
+int sstp_state_mppe_keys_set(sstp_state_st *state)
+{
+    if (!state)
+        return 0;
+    for (int i = 0; i < 16; i++)
+    {
+        if (state->mppe_send_key[i] != 0 || state->mppe_recv_key[i] != 0)
+            return 1;
+    }
+    return 0;
+}
+#endif
 /*!
  * @brief Handle the SSTP control message: CALL_CONNECT_ACK
  */
@@ -397,6 +590,49 @@ static status_t sstp_state_handle_data(sstp_state_st *state,
                                        sstp_buff_st *buf)
 {
     status_t ret = SSTP_FAIL;
+
+    /* If no forward function is set, handle PPP frames inline (e.g., MS-CHAPv2 when --nolaunchpppd) */
+    if (!state->forward_cb)
+    {
+        unsigned char *p = (unsigned char *)sstp_pkt_data(buf);
+        int plen = sstp_pkt_data_len(buf);
+        int off = 0;
+
+        while (off < plen)
+        {
+            int inlen = plen - off;
+            int outmax = 16384;
+            unsigned char outbuf[16384];
+            int ret2 = sstp_frame_decode(p + off, &inlen, outbuf, &outmax);
+
+            if (ret2 == SSTP_OVERFLOW || (inlen == 0))
+            {
+                /* Need more data or overflow, stop processing */
+                break;
+            }
+
+            if (ret2 != SSTP_OKAY)
+            {
+                /* Could not decode frame; advance and continue */
+                off += inlen;
+                continue;
+            }
+
+            /* outbuf now contains a single PPP frame payload of length outmax */
+            if (sstp_state_handle_ppp_frame(state, outbuf, outmax))
+            {
+                /* Frame handled by internal CHAP logic; continue to next */
+                off += inlen;
+                continue;
+            }
+
+            /* Not handled; we could forward to outside if needed */
+            off += inlen;
+        }
+
+        /* No forward set; we handled what we could */
+        return SSTP_OKAY;
+    }
 
     /* Forward the data back to the pppd layer */
     ret = state->forward_cb(state->fwctx, sstp_pkt_data(buf),

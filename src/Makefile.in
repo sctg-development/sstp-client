@@ -94,7 +94,8 @@ host_triplet = @host@
 sbin_PROGRAMS = sstpc$(EXEEXT)
 check_PROGRAMS = utest_task$(EXEEXT) utest_cmac$(EXEEXT) \
 	utest_chap$(EXEEXT) utest_fcs$(EXEEXT) utest_route$(EXEEXT) \
-	utest_md4$(EXEEXT)
+	utest_md4$(EXEEXT) utest_mschap$(EXEEXT) \
+	utest_chap_flow$(EXEEXT)
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_library.m4 \
@@ -139,6 +140,17 @@ utest_chap_LDADD = $(LDADD)
 utest_chap_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(utest_chap_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_utest_chap_flow_OBJECTS =  \
+	utest_chap_flow-utest_chap_flow.$(OBJEXT) \
+	utest_chap_flow-sstp-chap.$(OBJEXT) \
+	utest_chap_flow-md4.$(OBJEXT)
+utest_chap_flow_OBJECTS = $(am_utest_chap_flow_OBJECTS)
+utest_chap_flow_DEPENDENCIES = libsstp-log/libsstp_log.la \
+	libsstp-api/libsstp_api.la libsstp-compat/libsstp_compat.la
+utest_chap_flow_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(utest_chap_flow_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
+	-o $@
 am_utest_cmac_OBJECTS = utest_cmac-sstp-cmac.$(OBJEXT)
 utest_cmac_OBJECTS = $(am_utest_cmac_OBJECTS)
 utest_cmac_LDADD = $(LDADD)
@@ -154,6 +166,14 @@ utest_fcs_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 am_utest_md4_OBJECTS = utest_md4.$(OBJEXT) md4.$(OBJEXT)
 utest_md4_OBJECTS = $(am_utest_md4_OBJECTS)
 utest_md4_LDADD = $(LDADD)
+am_utest_mschap_OBJECTS = utest_mschap-utest_mschap.$(OBJEXT) \
+	utest_mschap-sstp-chap.$(OBJEXT) utest_mschap-md4.$(OBJEXT)
+utest_mschap_OBJECTS = $(am_utest_mschap_OBJECTS)
+utest_mschap_DEPENDENCIES = libsstp-log/libsstp_log.la \
+	libsstp-api/libsstp_api.la libsstp-compat/libsstp_compat.la
+utest_mschap_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(utest_mschap_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_utest_route_OBJECTS = utest_route-sstp-route.$(OBJEXT)
 utest_route_OBJECTS = $(am_utest_route_OBJECTS)
 utest_route_LDADD = $(LDADD)
@@ -194,8 +214,14 @@ am__depfiles_remade = ./$(DEPDIR)/md4.Po ./$(DEPDIR)/sstpc-md4.Po \
 	./$(DEPDIR)/sstpc-sstp-task.Po ./$(DEPDIR)/sstpc-sstp-util.Po \
 	./$(DEPDIR)/utest_chap-md4.Po \
 	./$(DEPDIR)/utest_chap-sstp-chap.Po \
+	./$(DEPDIR)/utest_chap_flow-md4.Po \
+	./$(DEPDIR)/utest_chap_flow-sstp-chap.Po \
+	./$(DEPDIR)/utest_chap_flow-utest_chap_flow.Po \
 	./$(DEPDIR)/utest_cmac-sstp-cmac.Po \
 	./$(DEPDIR)/utest_fcs-sstp-fcs.Po ./$(DEPDIR)/utest_md4.Po \
+	./$(DEPDIR)/utest_mschap-md4.Po \
+	./$(DEPDIR)/utest_mschap-sstp-chap.Po \
+	./$(DEPDIR)/utest_mschap-utest_mschap.Po \
 	./$(DEPDIR)/utest_route-sstp-route.Po \
 	./$(DEPDIR)/utest_task-sstp-task.Po
 am__mv = mv -f
@@ -217,12 +243,15 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(sstpc_SOURCES) $(utest_chap_SOURCES) $(utest_cmac_SOURCES) \
+SOURCES = $(sstpc_SOURCES) $(utest_chap_SOURCES) \
+	$(utest_chap_flow_SOURCES) $(utest_cmac_SOURCES) \
 	$(utest_fcs_SOURCES) $(utest_md4_SOURCES) \
-	$(utest_route_SOURCES) $(utest_task_SOURCES)
+	$(utest_mschap_SOURCES) $(utest_route_SOURCES) \
+	$(utest_task_SOURCES)
 DIST_SOURCES = $(sstpc_SOURCES) $(utest_chap_SOURCES) \
-	$(utest_cmac_SOURCES) $(utest_fcs_SOURCES) \
-	$(utest_md4_SOURCES) $(utest_route_SOURCES) \
+	$(utest_chap_flow_SOURCES) $(utest_cmac_SOURCES) \
+	$(utest_fcs_SOURCES) $(utest_md4_SOURCES) \
+	$(utest_mschap_SOURCES) $(utest_route_SOURCES) \
 	$(utest_task_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
@@ -606,12 +635,18 @@ utest_cmac_SOURCES = sstp-cmac.c
 utest_cmac_CFLAGS = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_CMAC=1
 utest_chap_SOURCES = sstp-chap.c md4.c
 utest_md4_SOURCES = utest_md4.c md4.c
+utest_mschap_SOURCES = utest_mschap.c sstp-chap.c md4.c
 utest_chap_CFLAGS = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_CHAP=1
 utest_fcs_SOURCES = sstp-fcs.c
 utest_fcs_CFLAGS = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_FCS=1
+utest_mschap_CFLAGS = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_MSCHAP=1
+utest_mschap_LDADD = libsstp-log/libsstp_log.la libsstp-api/libsstp_api.la libsstp-compat/libsstp_compat.la
+utest_chap_flow_SOURCES = utest_chap_flow.c sstp-chap.c md4.c
+utest_chap_flow_CFLAGS = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_MSCHAP_FLOW=1
+utest_chap_flow_LDADD = libsstp-log/libsstp_log.la libsstp-api/libsstp_api.la libsstp-compat/libsstp_compat.la
+TESTS = $(check_PROGRAMS)
 utest_route_SOURCES = sstp-route.c
 utest_route_CFLAGS = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_ROUTE=1
-TESTS = $(check_PROGRAMS)
 sstpc_SOURCES = \
     sstp-client.c       \
     sstp-option.c       \
@@ -738,6 +773,10 @@ utest_chap$(EXEEXT): $(utest_chap_OBJECTS) $(utest_chap_DEPENDENCIES) $(EXTRA_ut
 	@rm -f utest_chap$(EXEEXT)
 	$(AM_V_CCLD)$(utest_chap_LINK) $(utest_chap_OBJECTS) $(utest_chap_LDADD) $(LIBS)
 
+utest_chap_flow$(EXEEXT): $(utest_chap_flow_OBJECTS) $(utest_chap_flow_DEPENDENCIES) $(EXTRA_utest_chap_flow_DEPENDENCIES) 
+	@rm -f utest_chap_flow$(EXEEXT)
+	$(AM_V_CCLD)$(utest_chap_flow_LINK) $(utest_chap_flow_OBJECTS) $(utest_chap_flow_LDADD) $(LIBS)
+
 utest_cmac$(EXEEXT): $(utest_cmac_OBJECTS) $(utest_cmac_DEPENDENCIES) $(EXTRA_utest_cmac_DEPENDENCIES) 
 	@rm -f utest_cmac$(EXEEXT)
 	$(AM_V_CCLD)$(utest_cmac_LINK) $(utest_cmac_OBJECTS) $(utest_cmac_LDADD) $(LIBS)
@@ -749,6 +788,10 @@ utest_fcs$(EXEEXT): $(utest_fcs_OBJECTS) $(utest_fcs_DEPENDENCIES) $(EXTRA_utest
 utest_md4$(EXEEXT): $(utest_md4_OBJECTS) $(utest_md4_DEPENDENCIES) $(EXTRA_utest_md4_DEPENDENCIES) 
 	@rm -f utest_md4$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(utest_md4_OBJECTS) $(utest_md4_LDADD) $(LIBS)
+
+utest_mschap$(EXEEXT): $(utest_mschap_OBJECTS) $(utest_mschap_DEPENDENCIES) $(EXTRA_utest_mschap_DEPENDENCIES) 
+	@rm -f utest_mschap$(EXEEXT)
+	$(AM_V_CCLD)$(utest_mschap_LINK) $(utest_mschap_OBJECTS) $(utest_mschap_LDADD) $(LIBS)
 
 utest_route$(EXEEXT): $(utest_route_OBJECTS) $(utest_route_DEPENDENCIES) $(EXTRA_utest_route_DEPENDENCIES) 
 	@rm -f utest_route$(EXEEXT)
@@ -783,9 +826,15 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sstpc-sstp-util.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utest_chap-md4.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utest_chap-sstp-chap.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utest_chap_flow-md4.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utest_chap_flow-sstp-chap.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utest_chap_flow-utest_chap_flow.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utest_cmac-sstp-cmac.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utest_fcs-sstp-fcs.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utest_md4.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utest_mschap-md4.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utest_mschap-sstp-chap.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utest_mschap-utest_mschap.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utest_route-sstp-route.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utest_task-sstp-task.Po@am__quote@ # am--include-marker
 
@@ -1068,6 +1117,48 @@ utest_chap-md4.obj: md4.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_chap_CFLAGS) $(CFLAGS) -c -o utest_chap-md4.obj `if test -f 'md4.c'; then $(CYGPATH_W) 'md4.c'; else $(CYGPATH_W) '$(srcdir)/md4.c'; fi`
 
+utest_chap_flow-utest_chap_flow.o: utest_chap_flow.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_chap_flow_CFLAGS) $(CFLAGS) -MT utest_chap_flow-utest_chap_flow.o -MD -MP -MF $(DEPDIR)/utest_chap_flow-utest_chap_flow.Tpo -c -o utest_chap_flow-utest_chap_flow.o `test -f 'utest_chap_flow.c' || echo '$(srcdir)/'`utest_chap_flow.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utest_chap_flow-utest_chap_flow.Tpo $(DEPDIR)/utest_chap_flow-utest_chap_flow.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='utest_chap_flow.c' object='utest_chap_flow-utest_chap_flow.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_chap_flow_CFLAGS) $(CFLAGS) -c -o utest_chap_flow-utest_chap_flow.o `test -f 'utest_chap_flow.c' || echo '$(srcdir)/'`utest_chap_flow.c
+
+utest_chap_flow-utest_chap_flow.obj: utest_chap_flow.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_chap_flow_CFLAGS) $(CFLAGS) -MT utest_chap_flow-utest_chap_flow.obj -MD -MP -MF $(DEPDIR)/utest_chap_flow-utest_chap_flow.Tpo -c -o utest_chap_flow-utest_chap_flow.obj `if test -f 'utest_chap_flow.c'; then $(CYGPATH_W) 'utest_chap_flow.c'; else $(CYGPATH_W) '$(srcdir)/utest_chap_flow.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utest_chap_flow-utest_chap_flow.Tpo $(DEPDIR)/utest_chap_flow-utest_chap_flow.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='utest_chap_flow.c' object='utest_chap_flow-utest_chap_flow.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_chap_flow_CFLAGS) $(CFLAGS) -c -o utest_chap_flow-utest_chap_flow.obj `if test -f 'utest_chap_flow.c'; then $(CYGPATH_W) 'utest_chap_flow.c'; else $(CYGPATH_W) '$(srcdir)/utest_chap_flow.c'; fi`
+
+utest_chap_flow-sstp-chap.o: sstp-chap.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_chap_flow_CFLAGS) $(CFLAGS) -MT utest_chap_flow-sstp-chap.o -MD -MP -MF $(DEPDIR)/utest_chap_flow-sstp-chap.Tpo -c -o utest_chap_flow-sstp-chap.o `test -f 'sstp-chap.c' || echo '$(srcdir)/'`sstp-chap.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utest_chap_flow-sstp-chap.Tpo $(DEPDIR)/utest_chap_flow-sstp-chap.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sstp-chap.c' object='utest_chap_flow-sstp-chap.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_chap_flow_CFLAGS) $(CFLAGS) -c -o utest_chap_flow-sstp-chap.o `test -f 'sstp-chap.c' || echo '$(srcdir)/'`sstp-chap.c
+
+utest_chap_flow-sstp-chap.obj: sstp-chap.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_chap_flow_CFLAGS) $(CFLAGS) -MT utest_chap_flow-sstp-chap.obj -MD -MP -MF $(DEPDIR)/utest_chap_flow-sstp-chap.Tpo -c -o utest_chap_flow-sstp-chap.obj `if test -f 'sstp-chap.c'; then $(CYGPATH_W) 'sstp-chap.c'; else $(CYGPATH_W) '$(srcdir)/sstp-chap.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utest_chap_flow-sstp-chap.Tpo $(DEPDIR)/utest_chap_flow-sstp-chap.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sstp-chap.c' object='utest_chap_flow-sstp-chap.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_chap_flow_CFLAGS) $(CFLAGS) -c -o utest_chap_flow-sstp-chap.obj `if test -f 'sstp-chap.c'; then $(CYGPATH_W) 'sstp-chap.c'; else $(CYGPATH_W) '$(srcdir)/sstp-chap.c'; fi`
+
+utest_chap_flow-md4.o: md4.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_chap_flow_CFLAGS) $(CFLAGS) -MT utest_chap_flow-md4.o -MD -MP -MF $(DEPDIR)/utest_chap_flow-md4.Tpo -c -o utest_chap_flow-md4.o `test -f 'md4.c' || echo '$(srcdir)/'`md4.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utest_chap_flow-md4.Tpo $(DEPDIR)/utest_chap_flow-md4.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='md4.c' object='utest_chap_flow-md4.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_chap_flow_CFLAGS) $(CFLAGS) -c -o utest_chap_flow-md4.o `test -f 'md4.c' || echo '$(srcdir)/'`md4.c
+
+utest_chap_flow-md4.obj: md4.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_chap_flow_CFLAGS) $(CFLAGS) -MT utest_chap_flow-md4.obj -MD -MP -MF $(DEPDIR)/utest_chap_flow-md4.Tpo -c -o utest_chap_flow-md4.obj `if test -f 'md4.c'; then $(CYGPATH_W) 'md4.c'; else $(CYGPATH_W) '$(srcdir)/md4.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utest_chap_flow-md4.Tpo $(DEPDIR)/utest_chap_flow-md4.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='md4.c' object='utest_chap_flow-md4.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_chap_flow_CFLAGS) $(CFLAGS) -c -o utest_chap_flow-md4.obj `if test -f 'md4.c'; then $(CYGPATH_W) 'md4.c'; else $(CYGPATH_W) '$(srcdir)/md4.c'; fi`
+
 utest_cmac-sstp-cmac.o: sstp-cmac.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_cmac_CFLAGS) $(CFLAGS) -MT utest_cmac-sstp-cmac.o -MD -MP -MF $(DEPDIR)/utest_cmac-sstp-cmac.Tpo -c -o utest_cmac-sstp-cmac.o `test -f 'sstp-cmac.c' || echo '$(srcdir)/'`sstp-cmac.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utest_cmac-sstp-cmac.Tpo $(DEPDIR)/utest_cmac-sstp-cmac.Po
@@ -1095,6 +1186,48 @@ utest_fcs-sstp-fcs.obj: sstp-fcs.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sstp-fcs.c' object='utest_fcs-sstp-fcs.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_fcs_CFLAGS) $(CFLAGS) -c -o utest_fcs-sstp-fcs.obj `if test -f 'sstp-fcs.c'; then $(CYGPATH_W) 'sstp-fcs.c'; else $(CYGPATH_W) '$(srcdir)/sstp-fcs.c'; fi`
+
+utest_mschap-utest_mschap.o: utest_mschap.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_mschap_CFLAGS) $(CFLAGS) -MT utest_mschap-utest_mschap.o -MD -MP -MF $(DEPDIR)/utest_mschap-utest_mschap.Tpo -c -o utest_mschap-utest_mschap.o `test -f 'utest_mschap.c' || echo '$(srcdir)/'`utest_mschap.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utest_mschap-utest_mschap.Tpo $(DEPDIR)/utest_mschap-utest_mschap.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='utest_mschap.c' object='utest_mschap-utest_mschap.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_mschap_CFLAGS) $(CFLAGS) -c -o utest_mschap-utest_mschap.o `test -f 'utest_mschap.c' || echo '$(srcdir)/'`utest_mschap.c
+
+utest_mschap-utest_mschap.obj: utest_mschap.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_mschap_CFLAGS) $(CFLAGS) -MT utest_mschap-utest_mschap.obj -MD -MP -MF $(DEPDIR)/utest_mschap-utest_mschap.Tpo -c -o utest_mschap-utest_mschap.obj `if test -f 'utest_mschap.c'; then $(CYGPATH_W) 'utest_mschap.c'; else $(CYGPATH_W) '$(srcdir)/utest_mschap.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utest_mschap-utest_mschap.Tpo $(DEPDIR)/utest_mschap-utest_mschap.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='utest_mschap.c' object='utest_mschap-utest_mschap.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_mschap_CFLAGS) $(CFLAGS) -c -o utest_mschap-utest_mschap.obj `if test -f 'utest_mschap.c'; then $(CYGPATH_W) 'utest_mschap.c'; else $(CYGPATH_W) '$(srcdir)/utest_mschap.c'; fi`
+
+utest_mschap-sstp-chap.o: sstp-chap.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_mschap_CFLAGS) $(CFLAGS) -MT utest_mschap-sstp-chap.o -MD -MP -MF $(DEPDIR)/utest_mschap-sstp-chap.Tpo -c -o utest_mschap-sstp-chap.o `test -f 'sstp-chap.c' || echo '$(srcdir)/'`sstp-chap.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utest_mschap-sstp-chap.Tpo $(DEPDIR)/utest_mschap-sstp-chap.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sstp-chap.c' object='utest_mschap-sstp-chap.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_mschap_CFLAGS) $(CFLAGS) -c -o utest_mschap-sstp-chap.o `test -f 'sstp-chap.c' || echo '$(srcdir)/'`sstp-chap.c
+
+utest_mschap-sstp-chap.obj: sstp-chap.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_mschap_CFLAGS) $(CFLAGS) -MT utest_mschap-sstp-chap.obj -MD -MP -MF $(DEPDIR)/utest_mschap-sstp-chap.Tpo -c -o utest_mschap-sstp-chap.obj `if test -f 'sstp-chap.c'; then $(CYGPATH_W) 'sstp-chap.c'; else $(CYGPATH_W) '$(srcdir)/sstp-chap.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utest_mschap-sstp-chap.Tpo $(DEPDIR)/utest_mschap-sstp-chap.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sstp-chap.c' object='utest_mschap-sstp-chap.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_mschap_CFLAGS) $(CFLAGS) -c -o utest_mschap-sstp-chap.obj `if test -f 'sstp-chap.c'; then $(CYGPATH_W) 'sstp-chap.c'; else $(CYGPATH_W) '$(srcdir)/sstp-chap.c'; fi`
+
+utest_mschap-md4.o: md4.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_mschap_CFLAGS) $(CFLAGS) -MT utest_mschap-md4.o -MD -MP -MF $(DEPDIR)/utest_mschap-md4.Tpo -c -o utest_mschap-md4.o `test -f 'md4.c' || echo '$(srcdir)/'`md4.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utest_mschap-md4.Tpo $(DEPDIR)/utest_mschap-md4.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='md4.c' object='utest_mschap-md4.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_mschap_CFLAGS) $(CFLAGS) -c -o utest_mschap-md4.o `test -f 'md4.c' || echo '$(srcdir)/'`md4.c
+
+utest_mschap-md4.obj: md4.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_mschap_CFLAGS) $(CFLAGS) -MT utest_mschap-md4.obj -MD -MP -MF $(DEPDIR)/utest_mschap-md4.Tpo -c -o utest_mschap-md4.obj `if test -f 'md4.c'; then $(CYGPATH_W) 'md4.c'; else $(CYGPATH_W) '$(srcdir)/md4.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utest_mschap-md4.Tpo $(DEPDIR)/utest_mschap-md4.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='md4.c' object='utest_mschap-md4.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_mschap_CFLAGS) $(CFLAGS) -c -o utest_mschap-md4.obj `if test -f 'md4.c'; then $(CYGPATH_W) 'md4.c'; else $(CYGPATH_W) '$(srcdir)/md4.c'; fi`
 
 utest_route-sstp-route.o: sstp-route.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(utest_route_CFLAGS) $(CFLAGS) -MT utest_route-sstp-route.o -MD -MP -MF $(DEPDIR)/utest_route-sstp-route.Tpo -c -o utest_route-sstp-route.o `test -f 'sstp-route.c' || echo '$(srcdir)/'`sstp-route.c
@@ -1390,6 +1523,20 @@ utest_md4.log: utest_md4$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+utest_mschap.log: utest_mschap$(EXEEXT)
+	@p='utest_mschap$(EXEEXT)'; \
+	b='utest_mschap'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+utest_chap_flow.log: utest_chap_flow$(EXEEXT)
+	@p='utest_chap_flow$(EXEEXT)'; \
+	b='utest_chap_flow'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 .test.log:
 	@p='$<'; \
 	$(am__set_b); \
@@ -1505,9 +1652,15 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/sstpc-sstp-util.Po
 	-rm -f ./$(DEPDIR)/utest_chap-md4.Po
 	-rm -f ./$(DEPDIR)/utest_chap-sstp-chap.Po
+	-rm -f ./$(DEPDIR)/utest_chap_flow-md4.Po
+	-rm -f ./$(DEPDIR)/utest_chap_flow-sstp-chap.Po
+	-rm -f ./$(DEPDIR)/utest_chap_flow-utest_chap_flow.Po
 	-rm -f ./$(DEPDIR)/utest_cmac-sstp-cmac.Po
 	-rm -f ./$(DEPDIR)/utest_fcs-sstp-fcs.Po
 	-rm -f ./$(DEPDIR)/utest_md4.Po
+	-rm -f ./$(DEPDIR)/utest_mschap-md4.Po
+	-rm -f ./$(DEPDIR)/utest_mschap-sstp-chap.Po
+	-rm -f ./$(DEPDIR)/utest_mschap-utest_mschap.Po
 	-rm -f ./$(DEPDIR)/utest_route-sstp-route.Po
 	-rm -f ./$(DEPDIR)/utest_task-sstp-task.Po
 	-rm -f Makefile
@@ -1574,9 +1727,15 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/sstpc-sstp-util.Po
 	-rm -f ./$(DEPDIR)/utest_chap-md4.Po
 	-rm -f ./$(DEPDIR)/utest_chap-sstp-chap.Po
+	-rm -f ./$(DEPDIR)/utest_chap_flow-md4.Po
+	-rm -f ./$(DEPDIR)/utest_chap_flow-sstp-chap.Po
+	-rm -f ./$(DEPDIR)/utest_chap_flow-utest_chap_flow.Po
 	-rm -f ./$(DEPDIR)/utest_cmac-sstp-cmac.Po
 	-rm -f ./$(DEPDIR)/utest_fcs-sstp-fcs.Po
 	-rm -f ./$(DEPDIR)/utest_md4.Po
+	-rm -f ./$(DEPDIR)/utest_mschap-md4.Po
+	-rm -f ./$(DEPDIR)/utest_mschap-sstp-chap.Po
+	-rm -f ./$(DEPDIR)/utest_mschap-utest_mschap.Po
 	-rm -f ./$(DEPDIR)/utest_route-sstp-route.Po
 	-rm -f ./$(DEPDIR)/utest_task-sstp-task.Po
 	-rm -f Makefile

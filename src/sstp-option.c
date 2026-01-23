@@ -3,7 +3,7 @@
  *
  * @file sstp-options.c
  *
- * @author Copyright (C) 2011 Eivind Naess,
+ * @author Copyright (C) 2011 Eivind Naess, 2026 Ronan Le Meillat - SCTG Development,
  *      All Rights Reserved
  *
  * @par License:

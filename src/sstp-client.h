@@ -3,7 +3,7 @@
  *
  * @file sstp-client.c
  *
- * @author Copyright (C) 2011 Eivind Naess, 
+ * @author Copyright (C) 2011 Eivind Naess,
  *      All Rights Reserved
  *
  * @par License:
@@ -35,17 +35,16 @@ typedef struct sstp_peer
     /*! The peer name */
     char name[128];
 
-    /*! The address information of our peer */
-    struct sockaddr addr;
+    /*! The address information of our peer (capable of holding IPv4/IPv6) */
+    struct sockaddr_storage addr;
 
     /*! The address length */
     int alen;
-    
+
     /*! The peer's ssl session (for re-connect) */
     void *ssl_session;
 
 } sstp_peer_st;
-
 
 /*!
  * @brief Client context structure
@@ -90,5 +89,4 @@ typedef struct
 
 } sstp_client_st;
 
-
-#endif  /* #ifndef __SSTP_CLIENT_H__ */
+#endif /* #ifndef __SSTP_CLIENT_H__ */

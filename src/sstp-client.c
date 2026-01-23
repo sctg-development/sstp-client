@@ -3,7 +3,7 @@
  *
  * @file sstp-client.c
  *
- * @author Copyright (C) 2011 Eivind Naess, 
+ * @author Copyright (C) 2011 Eivind Naess,
  *      All Rights Reserved
  *
  * @par License:
@@ -30,28 +30,26 @@
 #include <unistd.h>
 #include <signal.h>
 
-
 #include "sstp-private.h"
 #include "sstp-client.h"
 
 /*! Global context for the sstp-client */
 static sstp_client_st client;
 
-typedef void (*sstp_client_cb)(sstp_stream_st*, sstp_buff_st*, sstp_client_st*, status_t);
+typedef void (*sstp_client_cb)(sstp_stream_st *, sstp_buff_st *, sstp_client_st *, status_t);
 
 /*!
  * @brief Called when proxy is connected
  */
 static void sstp_client_proxy_connected(sstp_stream_st *stream, sstp_buff_st *buf,
-        sstp_client_st *client, status_t status);
-
+                                        sstp_client_st *client, status_t status);
 
 static void sstp_client_event_cb(sstp_client_st *client, int ret)
 {
     uint8_t *skey;
     uint8_t *rkey;
-    size_t   slen;
-    size_t   rlen;
+    size_t slen;
+    size_t rlen;
 
     /* Check the result of the event */
     if (SSTP_OKAY != ret)
@@ -77,7 +75,6 @@ static void sstp_client_event_cb(sstp_client_st *client, int ret)
     }
 }
 
-
 static void sstp_client_pppd_cb(sstp_client_st *client, sstp_pppd_event_t ev)
 {
     int ret = (-1);
@@ -86,7 +83,7 @@ static void sstp_client_pppd_cb(sstp_client_st *client, sstp_pppd_event_t ev)
     {
     case SSTP_PPP_DOWN:
         log_err("PPPd terminated");
-        //sstp_state_disconnect(client->state);
+        // sstp_state_disconnect(client->state);
         event_base_loopbreak(client->ev_base);
         break;
 
@@ -106,8 +103,8 @@ static void sstp_client_pppd_cb(sstp_client_st *client, sstp_pppd_event_t ev)
         uint8_t rkey[16];
 
         /* Get the MPPE keys */
-        ret = sstp_chap_mppe_get(sstp_pppd_getchap(client->pppd), 
-                client->option.password, skey, rkey, 0); 
+        ret = sstp_chap_mppe_get(sstp_pppd_getchap(client->pppd),
+                                 client->option.password, skey, rkey, 0);
         if (SSTP_FAIL == ret)
         {
             return;
@@ -119,13 +116,12 @@ static void sstp_client_pppd_cb(sstp_client_st *client, sstp_pppd_event_t ev)
     }
 
     default:
-        
+
         break;
     }
 
     return;
 }
-
 
 /*!
  * @brief Called when the state machine transitions
@@ -139,39 +135,38 @@ static void sstp_client_state_cb(sstp_client_st *client, sstp_state_t event)
     case SSTP_CALL_CONNECT:
 
         /* Create the PPP context */
-        ret = sstp_pppd_create(&client->pppd, client->ev_base, client->stream, 
-                (sstp_pppd_fn) sstp_client_pppd_cb, client);
+        ret = sstp_pppd_create(&client->pppd, client->ev_base, client->stream,
+                               (sstp_pppd_fn)sstp_client_pppd_cb, client);
         if (SSTP_OKAY != ret)
         {
             sstp_die("Could not initialize PPP daemon", -1);
         }
 
         /* Start the pppd daemon */
-        ret = sstp_pppd_start(client->pppd, &client->option, 
-                sstp_event_sockname(client->event));
+        ret = sstp_pppd_start(client->pppd, &client->option,
+                              sstp_event_sockname(client->event));
         if (SSTP_OKAY != ret)
         {
             sstp_die("Could not start PPP daemon", -1);
         }
 
         /* Set the forwarder function */
-        sstp_state_set_forward(client->state, (sstp_state_forward_fn) 
-                sstp_pppd_send, client->pppd);
+        sstp_state_set_forward(client->state, (sstp_state_forward_fn)sstp_pppd_send, client->pppd);
 
         log_info("Started PPP Link Negotiation");
         break;
-    
+
     case SSTP_CALL_ESTABLISHED:
 
         log_info("Connection Established");
-        
+
         /* Enter the privilege separation directory */
         if (getuid() == 0)
         {
-            ret = sstp_sandbox(client->option.priv_dir, 
-                    client->option.priv_user, 
-                    client->option.priv_group);
-            if (ret != 0) 
+            ret = sstp_sandbox(client->option.priv_dir,
+                               client->option.priv_user,
+                               client->option.priv_group);
+            if (ret != 0)
             {
                 log_warn("Could not enter privilege directory");
             }
@@ -181,14 +176,13 @@ static void sstp_client_state_cb(sstp_client_st *client, sstp_state_t event)
 
     case SSTP_CALL_ABORT:
     default:
-        sstp_die("Connection was aborted, %s", -1, 
-                sstp_state_reason(client->state));
+        sstp_die("Connection was aborted, %s", -1,
+                 sstp_state_reason(client->state));
         break;
     }
 }
 
-
-/*! 
+/*!
  * @brief Called upon HTTP handshake complete w/result
  */
 static void sstp_client_http_done(sstp_client_st *client, int status)
@@ -218,13 +212,12 @@ static void sstp_client_http_done(sstp_client_st *client, int status)
     {
         if (!(SSTP_OPT_CERTWARN & client->option.enable))
             sstp_die("Verification of server certificate failed", -2);
-        
+
         log_warn("Server certificated failed verification, ignoring");
     }
 
     /* Now we need to start the state-machine */
-    status = sstp_state_create(&client->state, client->stream, (sstp_state_change_fn)
-            sstp_client_state_cb, client, SSTP_MODE_CLIENT);
+    status = sstp_state_create(&client->state, client->stream, (sstp_state_change_fn)sstp_client_state_cb, client, SSTP_MODE_CLIENT);
     if (SSTP_OKAY != status)
     {
         sstp_die("Could not create state machine", -1);
@@ -238,14 +231,13 @@ static void sstp_client_http_done(sstp_client_st *client, int status)
     }
 }
 
-
 /*!
  * @brief Called upon connect complete w/result
  */
-static void sstp_client_connected(sstp_stream_st *stream, sstp_buff_st *buf, 
-        sstp_client_st *client, status_t status)
+static void sstp_client_connected(sstp_stream_st *stream, sstp_buff_st *buf,
+                                  sstp_client_st *client, status_t status)
 {
-    int ret  = 0;
+    int ret = 0;
 
     if (SSTP_CONNECTED != status)
     {
@@ -256,8 +248,7 @@ static void sstp_client_connected(sstp_stream_st *stream, sstp_buff_st *buf,
     log_info("Connected to %s", client->host.name);
 
     /* Create the HTTP handshake context */
-    ret = sstp_http_create(&client->http, client->host.name, (sstp_http_done_fn) 
-            sstp_client_http_done, client, SSTP_MODE_CLIENT);
+    ret = sstp_http_create(&client->http, client->host.name, (sstp_http_done_fn)sstp_client_http_done, client, SSTP_MODE_CLIENT);
     if (SSTP_OKAY != ret)
     {
         sstp_die("Could not configure HTTP handshake with server", -1);
@@ -279,7 +270,6 @@ static void sstp_client_connected(sstp_stream_st *stream, sstp_buff_st *buf,
     return;
 }
 
-
 /*!
  * @brief Called on completion of the proxy request
  */
@@ -291,13 +281,13 @@ static void sstp_client_proxy_done(sstp_client_st *client, int status)
     {
     /* Proxy asked us to authenticate */
     case SSTP_AUTHENTICATE:
-        
+
         /* Close the connection, re-connect and use the credentials */
         sstp_stream_destroy(client->stream);
 
         /* Create the SSL I/O streams */
-        ret = sstp_stream_create(&client->stream, client->ev_base, 
-                client->ssl_ctx, client->host.name);
+        ret = sstp_stream_create(&client->stream, client->ev_base,
+                                 client->ssl_ctx, client->host.name);
         if (SSTP_OKAY != ret)
         {
             sstp_die("Could not create I/O stream", -1);
@@ -311,29 +301,28 @@ static void sstp_client_proxy_done(sstp_client_st *client, int status)
 
         /* Update with username and password */
         sstp_http_setcreds(client->http, client->url->user,
-                client->url->password);
+                           client->url->password);
 
         /* Reconnect to the proxy (now with credentials set) */
-        ret = sstp_stream_connect(client->stream, &client->host.addr, client->host.alen,
-                (sstp_complete_fn) sstp_client_proxy_connected, client, 10);
+        ret = sstp_stream_connect(client->stream, (struct sockaddr *)&client->host.addr, client->host.alen,
+                                  (sstp_complete_fn)sstp_client_proxy_connected, client, 10);
         break;
 
     case SSTP_OKAY:
 
-        log_info("Connected to %s via proxy server", 
-                client->option.server);
+        log_info("Connected to %s via proxy server",
+                 client->option.server);
 
         /* Re-initialize the HTTP context */
         sstp_http_free(client->http);
 
         /* Create the HTTP handshake context */
-        ret = sstp_http_create(&client->http, client->option.server, (sstp_http_done_fn) 
-                sstp_client_http_done, client, SSTP_MODE_CLIENT);
+        ret = sstp_http_create(&client->http, client->option.server, (sstp_http_done_fn)sstp_client_http_done, client, SSTP_MODE_CLIENT);
         if (SSTP_OKAY != ret)
         {
             sstp_die("Could not configure HTTP handshake with server", -1);
         }
-        
+
         /* Perform the HTTPS/SSTP handshake */
         ret = sstp_http_handshake(client->http, client->stream);
         if (SSTP_FAIL == ret)
@@ -352,12 +341,11 @@ static void sstp_client_proxy_done(sstp_client_st *client, int status)
     return;
 }
 
-
 /*!
  * @brief Called when connection to the proxy server is completed
  */
 static void sstp_client_proxy_connected(sstp_stream_st *stream, sstp_buff_st *buf,
-        sstp_client_st *client, status_t status)
+                                        sstp_client_st *client, status_t status)
 {
     int ret = 0;
 
@@ -367,10 +355,10 @@ static void sstp_client_proxy_connected(sstp_stream_st *stream, sstp_buff_st *bu
     }
 
     /* Create the HTTP object if one doesn't already exist */
-    if (!client->http) 
+    if (!client->http)
     {
         ret = sstp_http_create(&client->http, client->option.server,
-            (sstp_http_done_fn) sstp_client_proxy_done, client, SSTP_MODE_CLIENT);
+                               (sstp_http_done_fn)sstp_client_proxy_done, client, SSTP_MODE_CLIENT);
         if (SSTP_OKAY != ret)
         {
             sstp_die("Could not configure HTTP handshake with server", -1);
@@ -387,16 +375,15 @@ static void sstp_client_proxy_connected(sstp_stream_st *stream, sstp_buff_st *bu
     return;
 }
 
-
 /*!
  * @brief Connect to the server
  */
-static status_t sstp_client_connect(sstp_client_st *client, 
-        struct sockaddr *addr, int alen)
+static status_t sstp_client_connect(sstp_client_st *client,
+                                    struct sockaddr *addr, int alen)
 {
     sstp_client_cb complete_cb = (client->option.proxy)
-            ? sstp_client_proxy_connected
-            : sstp_client_connected;
+                                     ? sstp_client_proxy_connected
+                                     : sstp_client_connected;
     status_t ret = SSTP_FAIL;
 
     /* Create the I/O streams */
@@ -407,12 +394,12 @@ static status_t sstp_client_connect(sstp_client_st *client,
         goto done;
     }
 
-    ret = sstp_stream_connect(client->stream, addr, alen, (sstp_complete_fn) complete_cb, client, 10);
-    if (SSTP_INPROG != ret && 
-        SSTP_OKAY   != ret)
+    ret = sstp_stream_connect(client->stream, addr, alen, (sstp_complete_fn)complete_cb, client, 10);
+    if (SSTP_INPROG != ret &&
+        SSTP_OKAY != ret)
     {
-        log_err("Could not connect to the server, %s (%d)", 
-            strerror(errno), errno);
+        log_err("Could not connect to the server, %s (%d)",
+                strerror(errno), errno);
         goto done;
     }
 
@@ -452,7 +439,7 @@ static status_t sstp_init_ssl(sstp_client_st *client, sstp_option_st *opt)
     }
 
     /* Configure the crypto options, eliminate SSLv2 */
-    status = SSL_CTX_set_options(client->ssl_ctx, SSL_OP_ALL|SSL_OP_NO_SSLv2);
+    status = SSL_CTX_set_options(client->ssl_ctx, SSL_OP_ALL | SSL_OP_NO_SSLv2);
     if (status == -1)
     {
         log_err("Could not set SSL options");
@@ -463,8 +450,8 @@ static status_t sstp_init_ssl(sstp_client_st *client, sstp_option_st *opt)
     if (opt->ca_cert || opt->ca_path)
     {
         /* Look for certificates in the default certificate path */
-        status = SSL_CTX_load_verify_locations(client->ssl_ctx, 
-                opt->ca_cert, opt->ca_path);
+        status = SSL_CTX_load_verify_locations(client->ssl_ctx,
+                                               opt->ca_cert, opt->ca_path);
         if (status != 1)
         {
             log_err("Could not set default verify location");
@@ -478,10 +465,9 @@ static status_t sstp_init_ssl(sstp_client_st *client, sstp_option_st *opt)
     retval = SSTP_OKAY;
 
 done:
-    
+
     return (retval);
 }
-
 
 /*!
  * @brief Lookup the server name
@@ -489,22 +475,22 @@ done:
 static status_t sstp_client_lookup(sstp_url_st *uri, sstp_peer_st *peer)
 {
     char ipaddr[INET6_ADDRSTRLEN];
-    status_t status    = SSTP_FAIL;
-    const char *service= NULL;
-    addrinfo_st *list  = NULL;
-    addrinfo_st hints  = 
-    {
-        .ai_family   = AF_UNSPEC,
-        .ai_socktype = SOCK_STREAM,
-        .ai_protocol = 0,
-        .ai_flags    = AI_PASSIVE | AI_CANONNAME,
-    };
+    status_t status = SSTP_FAIL;
+    const char *service = NULL;
+    addrinfo_st *list = NULL;
+    addrinfo_st hints =
+        {
+            .ai_family = AF_UNSPEC,
+            .ai_socktype = SOCK_STREAM,
+            .ai_protocol = 0,
+            .ai_flags = AI_PASSIVE | AI_CANONNAME,
+        };
     int ret;
 
     /* Get the service string */
-    service = (uri->port) 
-        ? uri->port
-        : uri->schema;
+    service = (uri->port)
+                  ? uri->port
+                  : uri->schema;
 
     /* Resolve the server address */
     ret = getaddrinfo(uri->host, service, &hints, &list);
@@ -516,18 +502,19 @@ static status_t sstp_client_lookup(sstp_url_st *uri, sstp_peer_st *peer)
     }
 
     /* Save the results for later */
-    strncpy(peer->name, (list->ai_canonname) ? : uri->host, sizeof(peer->name));
-    memcpy(&peer->addr, list->ai_addr, sizeof(peer->addr));
+    strncpy(peer->name, (list->ai_canonname) ?: uri->host, sizeof(peer->name));
+    /* Copy exactly the amount returned by getaddrinfo to preserve IPv6 addresses */
+    memcpy(&peer->addr, list->ai_addr, (size_t)list->ai_addrlen);
     peer->alen = list->ai_addrlen;
 
-    log_info("Resolved %s to %s", peer->name, 
-        sstp_ipaddr(&peer->addr, ipaddr, sizeof(ipaddr)))
+    log_info("Resolved %s to %s", peer->name,
+             sstp_ipaddr((struct sockaddr *)&peer->addr, ipaddr, sizeof(ipaddr)))
 
-    /* Success! */
-    status = SSTP_OKAY;
+        /* Success! */
+        status = SSTP_OKAY;
 
 done:
-    
+
     if (list)
     {
         freeaddrinfo(list);
@@ -536,9 +523,8 @@ done:
     return status;
 }
 
-
 /*!
- * @brief Initialize the sstp-client 
+ * @brief Initialize the sstp-client
  */
 static status_t sstp_client_init(sstp_client_st *client, sstp_option_st *opts)
 {
@@ -560,7 +546,7 @@ static status_t sstp_client_init(sstp_client_st *client, sstp_option_st *opts)
         log_err("Could not initialize secure socket layer");
         goto done;
     }
-    
+
     /* Keep a copy of the options */
     memcpy(&client->option, opts, sizeof(client->option));
 
@@ -568,10 +554,9 @@ static status_t sstp_client_init(sstp_client_st *client, sstp_option_st *opts)
     retval = SSTP_OKAY;
 
 done:
-    
+
     return retval;
 }
-
 
 /*!
  * @brief Free any associated resources with the client
@@ -620,15 +605,13 @@ static void sstp_client_free(sstp_client_st *client)
     event_base_free(client->ev_base);
 }
 
-
 void sstp_signal_cb(int signal)
 {
-    log_err("Terminating on %s (%d)", 
+    log_err("Terminating on %s (%d)",
             strsignal(signal), signal);
 
     event_base_loopbreak(client.ev_base);
 }
-
 
 status_t sstp_signal_init(void)
 {
@@ -643,13 +626,13 @@ status_t sstp_signal_init(void)
     /* Handle Ctrl+C on keyboard */
     ret = sigaction(SIGINT, &act, NULL);
     if (ret)
-    {   
+    {
         goto done;
     }
 
     ret = sigaction(SIGHUP, &act, NULL);
     if (ret)
-    {   
+    {
         goto done;
     }
 
@@ -664,10 +647,9 @@ status_t sstp_signal_init(void)
     status = SSTP_OKAY;
 
 done:
-    
+
     return status;
 }
-
 
 /*!
  * @brief The main application entry-point
@@ -693,7 +675,7 @@ int main(int argc, char *argv[])
     {
         sstp_die("Could not initialize signal handling", -1);
     }
-   
+
     /* Parse the arguments */
     ret = sstp_parse_argv(&option, argc, argv);
     if (SSTP_OKAY != ret)
@@ -704,8 +686,8 @@ int main(int argc, char *argv[])
     /* Check if we can access the runtime directory */
     if (access(SSTP_RUNTIME_DIR, F_OK))
     {
-        ret = sstp_create_dir(SSTP_RUNTIME_DIR, option.priv_user, 
-                option.priv_group, 0755);
+        ret = sstp_create_dir(SSTP_RUNTIME_DIR, option.priv_user,
+                              option.priv_group, 0755);
         if (ret != 0)
         {
             log_warn("Could not access or create runtime directory");
@@ -716,11 +698,11 @@ int main(int argc, char *argv[])
     if (option.priv_dir && access(option.priv_dir, F_OK))
     {
         ret = sstp_create_dir(option.priv_dir, option.priv_user,
-                option.priv_group, 0700);
+                              option.priv_group, 0700);
         if (ret != 0)
         {
             log_warn("Could not access or create privilege separation directory, %s",
-                    option.priv_dir);
+                     option.priv_dir);
         }
     }
 
@@ -743,7 +725,7 @@ int main(int argc, char *argv[])
     if (!(option.enable & SSTP_OPT_NOPLUGIN))
     {
         ret = sstp_event_create(&client.event, &client.option, client.ev_base,
-            (sstp_event_fn) sstp_client_event_cb, &client);
+                                (sstp_event_fn)sstp_client_event_cb, &client);
         if (SSTP_OKAY != ret)
         {
             sstp_die("Could not setup notification", -1);
@@ -777,8 +759,8 @@ int main(int argc, char *argv[])
     }
 
     /* Connect to the server */
-    ret = sstp_client_connect(&client, &client.host.addr, 
-            client.host.alen);
+    ret = sstp_client_connect(&client, (struct sockaddr *)&client.host.addr,
+                              client.host.alen);
     if (SSTP_FAIL == ret)
     {
         sstp_die("Could not connect to `%s'", -1, client.host.name);
@@ -793,8 +775,8 @@ int main(int argc, char *argv[])
             sstp_die("Could not initialize route module", -1);
         }
 
-        ret = sstp_route_get(client.route_ctx, &client.host.addr,
-                &client.route);
+        ret = sstp_route_get(client.route_ctx, (struct sockaddr *)&client.host.addr,
+                             &client.route);
         if (ret != 0)
         {
             sstp_die("Could not get server route", -1);
@@ -803,10 +785,10 @@ int main(int argc, char *argv[])
         ret = sstp_route_replace(client.route_ctx, &client.route);
         if (ret != 0)
         {
-          sstp_die("Could not replace server route", -1);
+            sstp_die("Could not replace server route", -1);
         }
     }
-    
+
     /* Wait for the connect to finish and then continue */
     ret = event_base_dispatch(client.ev_base);
     if (ret != 0)
@@ -826,10 +808,10 @@ int main(int argc, char *argv[])
 
         sstp_pppd_session_details(client.pppd, &detail);
         log_info("SSTP session was established for %s",
-                sstp_norm_time(detail.established, buf1, sizeof(buf1)));
-        log_info("Received %s, sent %s", 
-                sstp_norm_data(detail.rx_bytes, buf1, sizeof(buf1)),
-                sstp_norm_data(detail.tx_bytes, buf2, sizeof(buf2)));
+                 sstp_norm_time(detail.established, buf1, sizeof(buf1)));
+        log_info("Received %s, sent %s",
+                 sstp_norm_data(detail.rx_bytes, buf1, sizeof(buf1)),
+                 sstp_norm_data(detail.tx_bytes, buf2, sizeof(buf2)));
     }
 
     /* Remove the server route */

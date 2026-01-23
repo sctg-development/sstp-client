@@ -42,7 +42,7 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Set version
               id: vars
@@ -149,7 +149,7 @@ jobs:
                   echo "artifact=$ARTIFACT" >> "$GITHUB_OUTPUT"
 
             - name: Upload built artifact for release step
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v6
               with:
                   name: ${{ matrix.name }}
                   path: ${{ steps.package.outputs.artifact }}
@@ -160,7 +160,7 @@ jobs:
         needs: build
         steps:
             - name: Download built artifacts
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@v7
               with:
                   # downloads all artifacts from previous job(s)
                   path: artifacts
@@ -184,13 +184,16 @@ jobs:
             - name: Create release (if needed)
               if: ${{ steps.relvars.outputs.created == 'true' }}
               id: create_release
-              uses: actions/create-release@v1
-              with:
-                  tag_name: ${{ steps.relvars.outputs.tag }}
-                  release_name: ${{ steps.relvars.outputs.tag }}
-                  body: "Nightly build from workflow run ${{ github.run_id }}"
-                  draft: false
-                  prerelease: true
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              shell: bash
+              run: |
+                  # create the release (idempotent if it already exists)
+                  gh release create "${{ steps.relvars.outputs.tag }}" --title "${{ steps.relvars.outputs.tag }}" --notes "Nightly build from workflow run ${{ github.run_id }}" --prerelease || true
+
+                  # produce a compact JSON response with at least the release id for downstream steps
+                  RESPONSE=$(gh release view "${{ steps.relvars.outputs.tag }}" --json id --jq -c '.')
+                  echo "response=$RESPONSE" >> $GITHUB_OUTPUT
 
             - name: Set release id (existing or newly created)
               id: set_release_id

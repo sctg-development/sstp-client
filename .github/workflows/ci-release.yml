@@ -168,12 +168,81 @@ jobs:
           # downloads all artifacts from previous job(s)
           path: artifacts
 
+      - name: Determine release tag from artifacts
+        id: get_version
+        shell: bash
+        run: |
+          set -e
+          # ensure jq is available for JSON fallback parsing
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y jq
+          fi
+
+          # Prefer linux amd64 artifact, else pick first archive
+          ARCH=$(find artifacts -type f -name '*ubuntu-24.04-amd64*.tar.gz' -print -quit)
+          if [ -z "$ARCH" ]; then
+            ARCH=$(find artifacts -type f -name '*linux*amd64*.tar.gz' -print -quit)
+          fi
+          if [ -z "$ARCH" ]; then
+            ARCH=$(find artifacts -type f -name '*.tar.gz' -print -quit)
+          fi
+
+          if [ -z "$ARCH" ]; then
+            echo "No archives found to determine version" >&2
+            if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+              VERSION=$(jq -r .release.tag_name < "$GITHUB_EVENT_PATH")
+            else
+              VERSION="${GITHUB_RUN_NUMBER}-nightly"
+            fi
+            TAG="$VERSION"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          mkdir -p /tmp/release-check
+          tar -xzf "$ARCH" -C /tmp/release-check
+
+          # Find the sstpc binary and try to run it to get version
+          BIN=$(find /tmp/release-check -type f -name sstpc -print -quit || true)
+          VERSION=""
+          if [ -n "$BIN" ] && file "$BIN" | grep -qi 'ELF\|executable'; then
+            VERSION=$("$BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+          fi
+
+          if [ -z "$VERSION" ]; then
+            # Try RELEASE_INFO produced by packaging
+            VERSION=$(grep -h '^version:' -m1 -R /tmp/release-check || true)
+            VERSION=${VERSION#version: }
+          fi
+
+          if [ -z "$VERSION" ]; then
+            if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+              VERSION=$(jq -r .release.tag_name < "$GITHUB_EVENT_PATH")
+            else
+              VERSION="${GITHUB_RUN_NUMBER}-nightly"
+            fi
+          fi
+
+          # normalize (strip leading v if present)
+          VERSION=${VERSION#v}
+
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            TAG="$VERSION"
+          else
+            TAG="${VERSION}-nightly"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
       - name: Create release_notes.md
         id: relvars
         shell: bash
         run: |
           cat > release_notes.md <<-EOF
-          # Release ${{ env.TAG }}
+          # Release ${{ steps.get_version.outputs.tag }}
           This is an automated release of **sstp-client**.
           ## Artifacts
           The following artifacts have been built and are attached to this release:
@@ -186,7 +255,7 @@ jobs:
         run: |
           set -e
           ls -lRa artifacts
-          TAG=${{ env.TAG }}
+          TAG=${{ steps.get_version.outputs.tag }}
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --title "sstp-client $TAG" --notes-file release_notes.md 
           fi

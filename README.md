@@ -37,8 +37,33 @@ Example integration steps for Ubuntu/Debian:
    SSTP-TEST\\JonDoe  sstp-test   'testme1234!'    *
    ```
 
+   Note: If you start `sstpc` with `--password`, the client will write the password to a temporary file and pass it to `pppd` using the `file <tmpfile>` option (see `src/sstp-pppd.c`). In that case `/etc/ppp/chap-secrets` may be unused. The temporary file is removed on cleanup, but ensure your system umask/permissions are secure and that the file is not left accessible to other users.
+
 2. Create a connect script in `/etc/ppp/peers/sstp-test`, similar to the example in `./support` (replace user-name as appropriate)
 3. Start the script with: `pon sstp-test`
+
+
+### macOS → Windows Server 2022 (note)
+
+On macOS, the shipped `pppd` may not support EAP/MSCHAPv2 inside EAP (EAP-MSCHAPv2). If your Windows Server uses that EAP method you can often connect by forcing PPP to refuse EAP and negotiate MS-CHAPv2 instead.
+
+Example (sanitised) command that successfully connected to a Windows Server 2022 in our tests:
+
+```bash
+# remove old pppd logfile then start sstpc (replace placeholders)
+rm -rf pppd.log && sudo src/sstpc \
+  --user 'DOMAIN\\user' \
+  --password '<your-password>' \
+  --debug --log-stdout --log-level 3 \
+  server.example.domain.tld \
+  -- debug refuse-eap logfile pppd.log
+```
+
+Notes:
+- The `--` separates sstpc options from options passed to `pppd` (here: `debug`, `refuse-eap`, `logfile pppd.log`).
+- Use `refuse-eap` to work around lack of EAP‑MSCHAPv2 support in the system `pppd` — it forces PPP to negotiate MS‑CHAPv2. Also add `require-mschap-v2` in pppd options if you want to require v2.
+- Check `pppd.log` (or the file you configured with `logfile`) to inspect PPP negotiation messages and troubleshoot authentication issues.
+- Make sure `/etc/ppp/chap-secrets` contains an entry matching the expected server name (or use `*` for the server field) and that its permissions are `600`.
 
 
 ## Future

@@ -168,21 +168,17 @@ jobs:
           # downloads all artifacts from previous job(s)
           path: artifacts
 
-      - name: Prepare tag / release details
+      - name: Create release_notes.md
         id: relvars
         shell: bash
         run: |
-          if [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
-            TAG=$(jq -r .release.tag_name < "$GITHUB_EVENT_PATH")
-            RELEASE_ID=$(jq -r .release.id < "$GITHUB_EVENT_PATH")
-            echo "tag=$TAG" >> $GITHUB_OUTPUT
-            echo "release_id=$RELEASE_ID" >> $GITHUB_OUTPUT
-            echo "created=false" >> $GITHUB_OUTPUT
-          else
-            TAG="nightly-${GITHUB_RUN_NUMBER}"
-            echo "tag=$TAG" >> $GITHUB_OUTPUT
-            echo "created=true" >> $GITHUB_OUTPUT
-          fi
+          cat > release_notes.md <<-EOF
+          # Release ${{ env.TAG }}
+          This is an automated release of **sstp-client**.
+          ## Artifacts
+          The following artifacts have been built and are attached to this release:
+          $(ls -1 artifacts)
+          EOF
 
       - name: Create or update release and upload assets
         env:

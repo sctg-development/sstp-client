@@ -101,3 +101,4 @@ src/utest_md4
 src/utest_md4.trs
 src/utest_mschap.trs
 src/utest_mschap
+ppp-2.5.2

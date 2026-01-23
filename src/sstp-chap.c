@@ -422,14 +422,6 @@ int sstp_chap_generate_nt_response(const uint8_t challenge[8], const uint8_t pas
 
             log_err("EVP_des_ecb not available, using legacy DES");
 
-            /* Use deprecated DES functions but suppress warnings around them */
-#if defined(__clang__)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
             {
                 DES_cblock keyblk;
                 DES_key_schedule ks;
@@ -437,11 +429,6 @@ int sstp_chap_generate_nt_response(const uint8_t challenge[8], const uint8_t pas
                 DES_set_key_unchecked(&keyblk, &ks);
                 DES_ecb_encrypt((DES_cblock *)challenge, (DES_cblock *)dout, &ks, DES_ENCRYPT);
             }
-#if defined(__clang__)
-#pragma clang diagnostic pop
-#elif defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
             /* Legacy DES used for this block */
             log_err("Using legacy DES implementation for NT-Response computation");

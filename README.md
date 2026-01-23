@@ -65,6 +65,21 @@ Notes:
 - Check `pppd.log` (or the file you configured with `logfile`) to inspect PPP negotiation messages and troubleshoot authentication issues.
 - Make sure `/etc/ppp/chap-secrets` contains an entry matching the expected server name (or use `*` for the server field) and that its permissions are `600`.
 
+EAP + MPPE proxy (new)
+
+- You can now enable sstp-client to act as an EAP+MPPE proxy with `--eap-auth`. When enabled, sstp-client handles EAP (EAP‑MSCHAPv2) negotiation and MPPE encryption/decryption itself and presents a clear PPP stream to the local `pppd` process.
+- Usage: add `--eap-auth` to your `sstpc` command line. Example:
+
+```bash
+sudo src/sstpc --eap-auth --user 'DOMAIN\\user' --password '<pwd>' --debug --log-stdout server.example.tld -- debug logfile pppd.log
+```
+
+Notes:
+- Initial implementation supports direct **EAP‑MSCHAPv2** and **MPPE**. PEAP/TTLS (EAP inside TLS) is not supported yet.
+- The MPPE implementation is functional for typical servers but does not yet implement advanced rekeying optimizations — please report interoperability issues.
+- This feature reuses algorithms and concepts from pppd (GPL‑2), see source attribution in the codebase.
+
+
 
 ## Future
 

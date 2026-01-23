@@ -39,6 +39,22 @@
 #undef log_err
 #define log_err(x, args...) \
     printf(x "\n", ##args)
+
+/* Minimal logging stubs used during unit testing */
+#include <stdarg.h>
+sstp_level_t sstp_log_level(void)
+{
+    return SSTP_LOG_DEBUG;
+}
+
+void sstp_log_msg(int level, const char *file, int line, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "\n");
+    va_end(ap);
+}
 #endif
 
 /*< Indicate that we are sending */
@@ -46,6 +62,22 @@
 
 /*< Indicating that we are acting as a server */
 #define SSTP_CHAP_SERVER 0x02
+
+/* Helper: log binary buffer as hex when debugging */
+static void sstp_log_hex(const char *label, const uint8_t *buf, size_t len)
+{
+    char hexbuf[128];
+    size_t i;
+
+    if (len > (sizeof(hexbuf) - 1) / 2)
+        len = (sizeof(hexbuf) - 1) / 2;
+
+    for (i = 0; i < len; i++)
+        sprintf(&hexbuf[i * 2], "%02x", buf[i]);
+    hexbuf[len * 2] = '\0';
+
+    log_debug("%s: %s", label, hexbuf);
+}
 
 /*!
  * @brief Create the a double MD4 hash from a password made into unicode
@@ -295,6 +327,9 @@ int sstp_chap_nt_password_hash(const char *pass, uint8_t hash[16])
     MD4_Update(&ctx, buf, (size_t)(len << 1));
     MD4_Final(hash, &ctx);
 
+    /* Debug: log the NT password hash (double-MD4 is logged in caller if needed) */
+    sstp_log_hex("NT password hash", hash, 16);
+
     return 0;
 }
 
@@ -350,6 +385,10 @@ int sstp_chap_challenge_hash(const uint8_t peer[16], const uint8_t auth[16], con
     EVP_MD_CTX_free(mdctx);
 
     memcpy(challenge, buf, 8);
+
+    /* Debug: log the computed challenge (first 8 bytes of SHA1) */
+    sstp_log_hex("CHAP challenge", challenge, 8);
+
     return 0;
 }
 
@@ -523,6 +562,9 @@ int sstp_chap_generate_nt_response(const uint8_t challenge[8], const uint8_t pas
         memcpy(nt_response + (i * 8), outbuf, 8);
     }
 
+    /* Debug: log the final NT-Response */
+    sstp_log_hex("NT-Response", nt_response, 24);
+
     return 0;
 }
 
@@ -537,11 +579,20 @@ int sstp_chap_mschapv2_nt_response(const uint8_t peer_challenge[16], const uint8
     if (sstp_chap_nt_password_hash(password, password_hash) < 0)
         return -1;
 
+    /* Debug: log the password hash */
+    sstp_log_hex("MSCHAPv2 password hash", password_hash, 16);
+
     if (sstp_chap_challenge_hash(peer_challenge, auth_challenge, user, challenge) < 0)
         return -1;
 
+    /* Debug: log the computed challenge */
+    sstp_log_hex("MSCHAPv2 challenge", challenge, 8);
+
     if (sstp_chap_generate_nt_response(challenge, password_hash, nt_response) < 0)
         return -1;
+
+    /* Debug: log the resulting NT-Response */
+    sstp_log_hex("MSCHAPv2 NT-Response", nt_response, 24);
 
     return 0;
 }

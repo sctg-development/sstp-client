@@ -365,6 +365,11 @@ status_t sstp_get_cert_hash(sstp_stream_st *ctx, int proto,
     status = SSTP_OKAY;
 
 done:
+    if (peer)
+    {
+        X509_free(peer);
+        peer = NULL;
+    }
 
     return (status);
 }
@@ -417,10 +422,40 @@ status_t sstp_verify_cert(sstp_stream_st *ctx, const char *host, int opts)
         }
     }
 
+    /* Debug: log TLS and certificate details */
+    log_debug("TLS protocol: %s, cipher: %s",
+              SSL_get_version(ctx->ssl), SSL_get_cipher_name(ctx->ssl));
+
+    {
+        char nm[256] = {0};
+        X509_NAME *s = X509_get_subject_name(peer);
+        if (s && X509_NAME_oneline(s, nm, sizeof(nm)))
+            log_debug("Peer certificate subject: %s", nm);
+
+        X509_NAME *i = X509_get_issuer_name(peer);
+        if (i && X509_NAME_oneline(i, nm, sizeof(nm)))
+            log_debug("Peer certificate issuer: %s", nm);
+
+        unsigned char hash[SHA256_DIGEST_LENGTH];
+        if (sstp_get_cert_hash(ctx, SSTP_PROTO_HASH_SHA256, hash, SHA256_DIGEST_LENGTH) == SSTP_OKAY)
+        {
+            char hb[SHA256_DIGEST_LENGTH * 2 + 1];
+            for (int ii = 0; ii < SHA256_DIGEST_LENGTH; ii++)
+                sprintf(&hb[ii * 2], "%02x", hash[ii]);
+            hb[SHA256_DIGEST_LENGTH * 2] = '\0';
+            log_debug("Peer certificate SHA256: %s", hb);
+        }
+    }
+
     /* Success */
     status = SSTP_OKAY;
 
 done:
+    if (peer)
+    {
+        X509_free(peer);
+        peer = NULL;
+    }
 
     return status;
 }

@@ -70,9 +70,11 @@ jobs:
                     export PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig:$(brew --prefix libevent)/lib/pkgconfig"
                     export LDFLAGS="-L$(brew --prefix openssl@3)/lib -L$(brew --prefix libevent)/lib"
                     export CPPFLAGS="-I$(brew --prefix openssl@3)/include -I$(brew --prefix libevent)/include"
+                    export LD_SHARED_CACHE_ELIGIBLE=NO
                     echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
                     echo "LDFLAGS=$LDFLAGS" >> $GITHUB_ENV
                     echo "CPPFLAGS=$CPPFLAGS" >> $GITHUB_ENV
+                    echo "LD_SHARED_CACHE_ELIGIBLE=$LD_SHARED_CACHE_ELIGIBLE" >> $GITHUB_ENV
                   fi
 
             - name: Prepare build (autoreconf)
